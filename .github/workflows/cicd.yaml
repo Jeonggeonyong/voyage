@@ -44,7 +44,7 @@ env:
   CHECKLIST_NAMESPACE: "voyage-app-02"             # [수정 8]
 
   # --- comparative-analysis 정보 ---
-  COMPARATIVE_ANALYSIS_DEPLOYMENT: "comparative-analysis"
+  COMPARATIVE_ANALYSIS_DEPLOYMENT: "comparative-analysis-module"
   COMPARATIVE_ANALYSIS_CONTAINER: "comparative-analysis"
   COMPARATIVE_ANALYSIS_NAMESPACE: "voyage-app-02"             # [수정 8]
 
