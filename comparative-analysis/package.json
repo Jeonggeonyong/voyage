@@ -7,6 +7,9 @@
     "start": "node comparative-analysis.js"
   },
   "dependencies": {
-    "express": "^4.18.2"
+    "axios": "^1.12.2",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "pg": "^8.16.3"
   }
 }

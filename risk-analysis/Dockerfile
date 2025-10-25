@@ -5,7 +5,7 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # 3. requirements.txt 대신 Flask를 직접 설치합니다.
-RUN pip install Flask
+RUN pip install Flask requests
 
 # 4. 소스 코드를 복사합니다.
 COPY risk-analysis.py .
@@ -14,4 +14,4 @@ COPY risk-analysis.py .
 EXPOSE 3000
 
 # 6. 컨테이너가 시작될 때 실행할 명령입니다.
-CMD ["python", "risk-analysis.py"]
+CMD ["flask", "run", "--host=0.0.0.0", "--port=3000"]
