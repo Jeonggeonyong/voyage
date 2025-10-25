@@ -11,7 +11,7 @@ on:
 # -----------------------------------------------------
 env:
   # 사용할 단일 Docker Hub 저장소
-  DOCKERHUB_REPO: "jeonnggeonyong/voyage"  # [수정 1]
+  DOCKERHUB_REPO: "jeonggeonyong/voyage"  # [수정 1]
   
   # --- RISK_ANALYSIS 정보 ---
   RISK_ANALYSIS_DEPLOYMENT: "risk-analysis-module"    # [수정 2]
