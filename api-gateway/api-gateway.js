@@ -23,6 +23,8 @@ const services = {
   '/alarm': { target: 'http://alarm.voyage-app-02' },
   '/risk-analysis': { target: 'http://risk-analysis.voyage-app-02' },
   '/community': { target: 'http://community.voyage-app-02' },
+  '/comparative-analysis': { target: 'http://comparative-analysis.voyage-app-02' },
+  '/checklist': { target: 'http://checklist.voyage-app-02' }
 };
 
 // [설정] JWT 인증이 필요 없는 공개 경로 목록

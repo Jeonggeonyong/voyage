@@ -1,0 +1,12 @@
+{
+  "name": "comparative-analysis-server",
+  "version": "1.0.0",
+  "description": "comparative-analysis server for CI/CD",
+  "main": "comparative-analysis.js",
+  "scripts": {
+    "start": "node comparative-analysis.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
