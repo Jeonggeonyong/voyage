@@ -1,0 +1,12 @@
+{
+  "name": "alarm-server",
+  "version": "1.0.0",
+  "description": "ALARM server for CI/CD",
+  "main": "alarm.js",
+  "scripts": {
+    "start": "node alarm.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

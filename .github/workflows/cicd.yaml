@@ -1,0 +1,188 @@
+# .github/workflows/cicd.yml
+
+name: KT-Cloud K8s CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+
+# -----------------------------------------------------
+# [수정] 환경 변수: 5개 서버의 네임스페이스를 각각 지정
+# -----------------------------------------------------
+env:
+  # 사용할 단일 Docker Hub 저장소
+  DOCKERHUB_REPO: "jeonnggeonyong/voyage"  # [수정 1]
+  
+  # --- RISK_ANALYSIS 정보 ---
+  RISK_ANALYSIS_DEPLOYMENT: "risk-analysis-module"    # [수정 2]
+  RISK_ANALYSIS_CONTAINER: "risk-analysis"     # [수정 3]
+  RISK_ANALYSIS_NAMESPACE: "voyage-app-02"             # [수정 4]
+  
+  # --- COMMUNITY 정보 ---
+  COMMUNITY_DEPLOYMENT: "community-module"
+  COMMUNITY_CONTAINER: "community"
+  COMMUNITY_NAMESPACE: "voyage-app-02"             # [수정 5]
+  
+  # --- API_GATEWAY 정보 ---
+  API_GATEWAY_DEPLOYMENT: "api-gateway-module"
+  API_GATEWAY_CONTAINER: "api-gateway"
+  API_GATEWAY_NAMESPACE: "voyage-app-01"             # [수정 6]
+
+  # --- OAUTH2 정보 ---
+  OAUTH2_DEPLOYMENT: "oauth2-module"
+  OAUTH2_CONTAINER: "oauth2"
+  OAUTH2_NAMESPACE: "voyage-app-02"             # [수정 7]
+
+  # --- ALARM 정보 ---
+  ALARM_DEPLOYMENT: "alarm-module"
+  ALARM_CONTAINER: "alarm"
+  ALARM_NAMESPACE: "voyage-app-02"             # [수정 8]
+
+# -----------------------------------------------------
+# CI Job: 5개 이미지 모두 빌드 
+# -----------------------------------------------------
+jobs:
+  build-and-push:
+    name: Build and Push to DockerHub
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Generate image tag
+        id: generate_tag
+        run: echo "tag=$(echo ${GITHUB_SHA} | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      # --- RISK_ANALYSIS 빌드/푸시 ---
+      - name: Build and push risk-analysis image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./risk-analysis # [수정 9]
+          file: ./risk-analysis/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_REPO }}:risk-analysis-${{ steps.generate_tag.outputs.tag }}
+            ${{ env.DOCKERHUB_REPO }}:risk-analysis-latest
+
+      # --- COMMUNITY 빌드/푸시 ---
+      - name: Build and push community image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./community  # [수정 10]
+          file: ./community/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_REPO }}:community-${{ steps.generate_tag.outputs.tag }}
+            ${{ env.DOCKERHUB_REPO }}:community-latest
+
+      # --- API_GATEWAY 빌드/푸시 ---
+      - name: Build and push api-gateway image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./api-gateway # [수정 11]
+          file: ./api-gateway/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_REPO }}:api-gateway-${{ steps.generate_tag.outputs.tag }}
+            ${{ env.DOCKERHUB_REPO }}:api-gateway-latest
+
+      # --- OAUTH2 빌드/푸시 ---
+      - name: Build and push oauth2 image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./oauth2 # [수정 11]
+          file: ./oauth2/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_REPO }}:oauth2-${{ steps.generate_tag.outputs.tag }}
+            ${{ env.DOCKERHUB_REPO }}:oauth2-latest
+      
+      # --- ALARM 빌드/푸시 ---
+      - name: Build and push alarm image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./alarm # [수정 11]
+          file: ./alarm/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_REPO }}:alarm-${{ steps.generate_tag.outputs.tag }}
+            ${{ env.DOCKERHUB_REPO }}:alarm-latest
+
+# -----------------------------------------------------
+# CD Job: 5개 Deployment 모두 배포
+# -----------------------------------------------------
+  deploy-to-k8s:
+    name: Deploy to KT-Cloud K8s
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Generate image tag
+        id: generate_tag
+        run: echo "tag=$(echo ${GITHUB_SHA} | cut -c1-7)" >> $GITHUB_OUTPUT
+        
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Set K8s context
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+      # --- risk-analysis 배포 ---
+      - name: Deploy risk-analysis
+        run: |
+          kubectl set image deployment/${{ env.RISK_ANALYSIS_DEPLOYMENT }} \
+            ${{ env.RISK_ANALYSIS_CONTAINER }}=${{ env.DOCKERHUB_REPO }}:risk-analysis-${{ steps.generate_tag.outputs.tag }} \
+            -n ${{ env.RISK_ANALYSIS_NAMESPACE }}  # [변경됨]
+
+      # --- community 배포 ---
+      - name: Deploy community
+        run: |
+          kubectl set image deployment/${{ env.COMMUNITY_DEPLOYMENT }} \
+            ${{ env.COMMUNITY_CONTAINER }}=${{ env.DOCKERHUB_REPO }}:community-${{ steps.generate_tag.outputs.tag }} \
+            -n ${{ env.COMMUNITY_NAMESPACE }}  # [변경됨]
+
+      # --- api-gateway 배포 ---
+      - name: Deploy api-gateway
+        run: |
+          kubectl set image deployment/${{ env.API_GATEWAY_DEPLOYMENT }} \
+            ${{ env.API_GATEWAY_CONTAINER }}=${{ env.DOCKERHUB_REPO }}:api-gateway-${{ steps.generate_tag.outputs.tag }} \
+            -n ${{ env.API_GATEWAY_NAMESPACE }}  # [변경됨]
+
+      # --- oauth2 배포 ---
+      - name: Deploy oauth2
+        run: |
+          kubectl set image deployment/${{ env.OAUTH2_DEPLOYMENT }} \
+            ${{ env.OAUTH2_CONTAINER }}=${{ env.DOCKERHUB_REPO }}:oauth2-${{ steps.generate_tag.outputs.tag }} \
+            -n ${{ env.OAUTH2_NAMESPACE }}  # [변경됨]
+
+      # --- alarm 배포 ---
+      - name: Deploy alarm
+        run: |
+          kubectl set image deployment/${{ env.ALARM_DEPLOYMENT }} \
+            ${{ env.ALARM_CONTAINER }}=${{ env.DOCKERHUB_REPO }}:alarm-${{ steps.generate_tag.outputs.tag }} \
+            -n ${{ env.ALARM_NAMESPACE }}  # [변경됨]
+
+      # --- 6. 배포 상태 확인 (각 네임스페이스별로 확인) ---
+      - name: Verify deployments
+        run: |
+          echo "--- Verifying Deployments (Total 5) ---"
+          kubectl rollout status deployment/${{ env.RISK_ANALYSIS_DEPLOYMENT }} -n ${{ env.RISK_ANALYSIS_NAMESPACE }} # [변경됨]
+          kubectl rollout status deployment/${{ env.COMMUNITY_DEPLOYMENT }} -n ${{ env.COMMUNITY_NAMESPACE }} # [변경됨]
+          kubectl rollout status deployment/${{ env.API_GATEWAY_DEPLOYMENT }} -n ${{ env.API_GATEWAY_NAMESPACE }} # [변경됨]
+          kubectl rollout status deployment/${{ env.OAUTH2_DEPLOYMENT }} -n ${{ env.OAUTH2_NAMESPACE }} # [변경됨]
+          kubectl rollout status deployment/${{ env.ALARM_DEPLOYMENT }} -n ${{ env.ALARM_NAMESPACE }} # [변경됨]
+          echo "-----------------------------------"
+          echo "--- Pods in voyage-app-01 ---"
+          kubectl get pods -o wide -n voyage-app-01 # [변경됨]
+          echo "--- Pods in voyage-app-02 ---"
+          kubectl get pods -o wide -n voyage-app-02 # [변경됨]
