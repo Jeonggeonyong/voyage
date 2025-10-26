@@ -1,6 +1,9 @@
 import os
+from dotenv import load_dotenv
 import psycopg2
 from flask import Flask, request, jsonify
+
+load_dotenv()
 
 def init_db():
     t1 = """CREATE TABLE IF NOT EXISTS users (
@@ -29,10 +32,11 @@ def init_db():
 
 def get_db_connection():
     conn = psycopg2.connect(
-        host=os.getenv("DATABASE_HOST"),
-        dbname=os.getenv("DATABASE_NAME"),
-        user=os.getenv("DATABASE_USER"),
-        password=os.getenv("DATABASE_PASSWORD")
+        host=os.getenv("DB_HOST"),
+        dbname=os.getenv("DB_DATABASE"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        port=os.getenv("DB_PORT")
     )
     return conn
 
@@ -43,7 +47,7 @@ with app.app_context():
     
 @app.route('/')
 def hello():
-    return jsonify({"welcome": "Voyage Community Server"})
+    return jsonify({"msg": "Voyage Community Server"})
 
 @app.route("/users", methods=["GET", "POST"])
 def users_main():
