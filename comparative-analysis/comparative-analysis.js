@@ -27,17 +27,17 @@ estatesCompareServer.listen(PORT, '0.0.0.0', () => {
 // URL 예시 host/users/123/estates?analysisCompleted=true
 estatesCompareServer.get('/users/:userId/estates', async (req, res) => {
     try {
-        // 💡 수정: 경로 파라미터는 userId로 받아야 합니다.
+        // 경로 파라미터는 userId로 받아야 합니다.
         const userId = req.params.userId; 
         const { analysisCompleted, contractCompleted, subscribed, interested } = req.query;
 
-        // 💡 수정: userId로 파라미터 이름 수정
+        // userId로 파라미터 이름 수정
         if (!userId) {
             return res.status(400).json({ message: "사용자 ID가 필요합니다." });
         }
 
         // 각 매물 조회 쿼리
-        // 💡 수정: 쿼리들을 동적 구성을 위해 제거하고 단일 쿼리로 통합합니다.
+        // 쿼리들을 동적 구성을 위해 제거하고 단일 쿼리로 통합합니다.
         let sqlQuery = `
             SELECT estate_id, estate_address, user_id, created_at, interaction_type 
             FROM USER_INTERACTION
@@ -45,10 +45,10 @@ estatesCompareServer.get('/users/:userId/estates', async (req, res) => {
         `;
         const params = [userId];
         
-        // 💡 수정: 쿼리 필터링을 동적으로 처리하여 복합 조건을 지원합니다.
+        // 쿼리 필터링을 동적으로 처리하여 복합 조건을 지원합니다.
         const interactionTypes = [];
 
-        // 💡 수정: req.query 값을 문자열 'true'와 비교합니다.
+        // req.query 값을 문자열 'true'와 비교합니다.
         if (analysisCompleted === 'true') {
             interactionTypes.push('analysis_completed');
         }
@@ -68,10 +68,10 @@ estatesCompareServer.get('/users/:userId/estates', async (req, res) => {
             params.push(...interactionTypes);
         }
 
-        // 💡 수정: 동적 쿼리로 대체했으므로 if/else 블록 제거 후 바로 쿼리 실행
+        // 동적 쿼리로 대체했으므로 if/else 블록 제거 후 바로 쿼리 실행
         const response = await query(sqlQuery, params);
         
-        // 💡 수정: DB 결과의 행 개수는 .rows.length로 확인합니다.
+        // DB 결과의 행 개수는 .rows.length로 확인합니다.
         if (response.rows.length === 0) {
             return res.status(404).json({ message: "찾을 매물이 없습니다." });
         }
