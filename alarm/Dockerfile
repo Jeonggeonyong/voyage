@@ -16,11 +16,11 @@ RUN npm install --omit=dev
 # (빌드 컨텍스트가 상위 디렉토리(voyage/)라고 가정합니다.)
 
 # 5a. ALARM 서버 파일 복사
-COPY alarm/alarm_server.js ./alarm_server.js
+COPY ../alarm/alarm_server.js ./alarm_server.js
 
 # 5b. DB 모듈 복사: alarm 폴더에서 가져와서 WORKDIR의 루트에 복사합니다.
 # (소스: alarm/db.js, 대상: ./db.js)
-COPY alarm/db.js ./db.js
+COPY ../alarm/db.js ./db.js
 # .env 파일 복사 라인 제거: 클라우드 Secret/ConfigMap으로 환경 변수를 주입합니다.
 
 
