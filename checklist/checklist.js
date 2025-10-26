@@ -9,17 +9,93 @@ checkListServer.use(express.json());
 
 // K8s Deployment의 containerPort와 일치시켜야 합니다.
 const PORT = 3000;
-checkListServer.listen(PORT);
+
+async function initializeDatabase() {
+    console.log('🔄 데이터베이스 테이블 초기화를 시작합니다...');
+    
+    // 테이블 생성 SQL 쿼리 목록 (총 4개 테이블)
+    const createTableQueries = [
+        // 1. USER_checklist 테이블
+        `
+        CREATE TABLE IF NOT EXISTS "user_checklist" (
+            user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_name VARCHAR(50),
+            email VARCHAR(255),
+            password VARCHAR(255),
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            phone_number VARCHAR(20),
+            home_address VARCHAR(255)
+        );
+        `,
+        // 2. ESTATE_checklist 테이블
+        `
+        CREATE TABLE IF NOT EXISTS "estate_checklist" (
+            estate_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            estate_name VARCHAR(255),
+            estate_address VARCHAR(255),
+            zip_no VARCHAR(10),
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+        `,
+        // 3. THREAT_analysis 테이블 (정적 테이블 - USER_CHECKLIST_checklist보다 먼저 생성되어야 함)
+        `
+        CREATE TABLE IF NOT EXISTS "threat_analysis" (
+            threat_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            threat_name VARCHAR(50) NOT NULL,
+            contents TEXT,
+            category VARCHAR(10) NOT NULL CHECK (category IN ('title', 'a', 'b'))
+        );
+        `,
+        // 4. USER_CHECKLIST_checklist 테이블 (THREAT_analysis 참조)
+        `
+        CREATE TABLE IF NOT EXISTS "user_checklist_checklist" (
+            user_checklist_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            
+            -- user_checklist.user_id 참조
+            user_id UUID REFERENCES user_checklist(user_id) ON DELETE CASCADE,
+            
+            -- estate_checklist.estate_id 참조
+            estate_id UUID REFERENCES estate_checklist(estate_id) ON DELETE CASCADE,
+            
+            -- threat_analysis.threat_id 참조 추가
+            threat_id UUID REFERENCES threat_analysis(threat_id), 
+            
+            -- 체크리스트의 단계 분류
+            category VARCHAR(20) NOT NULL CHECK (category IN ('analysis', 'before_contract', 'contract_day', 'after_contract', 'after_expiration')),
+            is_checked BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+        `
+    ];
+
+    try {
+        // 모든 쿼리를 순차적으로 실행
+        for (const sql of createTableQueries) {
+            await query(sql, []);
+        }
+        console.log('모든 데이터베이스 테이블이 성공적으로 준비되었습니다.');
+    } catch (err) {
+        console.error('데이터베이스 테이블 초기화 중 치명적인 오류 발생:', err.message);
+        process.exit(1); 
+    }
+}
+
+// 서버 listen 전에 initializeDatabase 호출 및 대기
+initializeDatabase().then(() => {
+    // 0.0.0.0으로 호스트를 지정해야 Docker 컨테이너 외부에서 접근이 가능합니다.
+    checkListServer.listen(PORT, '0.0.0.0', () => {
+        console.log(`CHECKLIST server listening on port ${PORT}`);
+    });
+}).catch(err => {
+    console.error('서버 시작 중 오류 발생:', err);
+    process.exit(1);
+});
 
 checkListServer.get('/', (req, res) => {
     // 이 서버가 어떤 서버인지 식별할 수 있는 메시지를 반환합니다.
     res.send('Hello from Express! (CHECKLIST server v1)');
 });
 
-// 0.0.0.0으로 호스트를 지정해야 Docker 컨테이너 외부에서 접근이 가능합니다.
-checkListServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`CHECKLIST server listening on port ${PORT}`);
-});
 
 // 위험 분석 후 위험 분석 DB와 체크리스트 DB에 INSERT 하고,
 // 체크리스트 DB의 USER_CHECKLIST 테이블 조회
@@ -37,7 +113,7 @@ checkListServer.get('/users/:userId/:estateId/checklist', async (req, res) => {
 
         // SQL 쿼리 기본 부분
         let sqlQuery = `
-            SELECT * FROM USER_CHECKLIST
+            SELECT * FROM user_checklist_checklist
             WHERE user_id = $1 AND estate_id = $2
         `;
         const params = [userId, estateId];
@@ -109,7 +185,7 @@ checkListServer.put('/users/:userId/:estateId/checklists', async (req, res) => {
             }
 
             const updateQuery = `
-                UPDATE USER_CHECKLIST
+                UPDATE user_checklist_checklist
                 SET is_checked = $1
                 WHERE user_id = $2
                 AND estate_id = $3
