@@ -15,15 +15,13 @@ RUN npm install --omit=dev
 # 5. 소스 코드와 필요한 모듈을 복사합니다.
 # (빌드 컨텍스트가 상위 디렉토리(voyage/)라고 가정합니다.)
 
-# ALARM 서버 파일 복사
+# 5a. ALARM 서버 파일 복사
 COPY alarm/alarm_server.js ./alarm_server.js
 
-# DB 모듈 의존성 복사: alarm_server.js가 '../oauth2/db.js'를 require 하므로 필요합니다.
-# oauth2 디렉토리 구조를 컨테이너 내부에 재현합니다.
-RUN mkdir -p /usr/src/app/oauth2
-COPY oauth2/db.js ./oauth2/db.js
-# .env 파일 복사 (DB 접속 정보 로드를 위해)
-COPY oauth2/.env ./.env
+# 5b. DB 모듈 복사: alarm 폴더에서 가져와서 WORKDIR의 루트에 복사합니다.
+# (소스: alarm/db.js, 대상: ./db.js)
+COPY alarm/db.js ./db.js
+# .env 파일 복사 라인 제거: 클라우드 Secret/ConfigMap으로 환경 변수를 주입합니다.
 
 
 # 6. 앱이 3000번 포트를 사용한다고 명시합니다.

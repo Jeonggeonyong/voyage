@@ -13,15 +13,14 @@ RUN npm install --omit=dev
 # 4. 소스 코드와 필요한 모듈을 복사합니다.
 # (빌드 컨텍스트가 voyage/의 상위 디렉토리라고 가정합니다.)
 
-# checklist 서버 파일 복사
+# 4a. checklist 서버 파일 복사
 COPY checklist/checklist.js ./
 
-# 💡 oauth2 디렉토리 생성 및 DB 모듈/설정 파일 복사
-# DB 모듈을 가져올 수 있도록 oauth2 디렉토리 구조를 생성합니다.
-RUN mkdir -p /usr/src/app/oauth2
-COPY oauth2/db.js ./oauth2/db.js
-# .env 파일 복사 (dotenv 로드를 위해)
-COPY oauth2/.env ./.env
+# 4b. DB 모듈 복사: checklist 폴더에서 가져와서 WORKDIR의 루트에 복사합니다.
+# (소스: checklist/db.js, 대상: ./db.js)
+COPY checklist/db.js ./db.js
+# .env 파일 복사 (DB 접속 정보 로드를 위해)
+# 💡 클라우드 Secret/ConfigMap으로 환경 변수를 주입하기 위해 이 라인을 제거합니다.
 
 
 # 5. 앱이 3000번 포트를 사용한다고 명시합니다.
