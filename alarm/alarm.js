@@ -2,7 +2,7 @@ const express = require('express')
 const axios = require('axios')
 const cors = require('cors')
 const { default: nodeCron } = require('node-cron')
-const { query } = require('../oauth2/db.js');
+const { query } = require('db.js');
 
 // 푸시 알림 관련 모듈 -> 클라이언트에서 토큰 사용
 // const admin = require('firebase-admin');

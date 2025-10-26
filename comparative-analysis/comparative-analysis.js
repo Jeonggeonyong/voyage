@@ -2,8 +2,7 @@ const express = require('express')
 const estatesCompareServer = express() // 추후에 위험 분석 서버 내부의 한 서비스로 라우팅할 예정
 const axios = require('axios')
 const cors = require('cors')
-// import { query } from '../oauth2/db.js' // 원래의 import 대신 require로 변경
-const { query } = require('../oauth2/db.js') // DB 쿼리 실행 함수 가져옴
+const { query } = require('db.js') // DB 쿼리 실행 함수 가져옴
 
 estatesCompareServer.use(cors()) // 모든 요청 받을 예정 -> 이후 수정 예정
 estatesCompareServer.use(express.json()); // 
