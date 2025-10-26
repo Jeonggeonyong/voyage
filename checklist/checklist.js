@@ -1,7 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
-const { pool, query } = require('db.js');
+const { pool, query } = require('./db.js');
 
 const checkListServer = express()
 checkListServer.use(cors())
