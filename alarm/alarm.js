@@ -19,25 +19,26 @@ notifyServer.use(express.json()); // json 형식으로 받을 것
 const PORT = 3000;
 
 async function initializeDatabase() {
-    console.log('🔄 데이터베이스 테이블 초기화를 시작합니다...');
+    console.log('DB 테이블 초기화를 시작합니다.');
     
-    // 테이블 생성 SQL 쿼리 목록 (3개 테이블만)
+    // 테이블 생성 SQL 쿼리 목록 (총 4개 테이블)
     const createTableQueries = [
-        // 1. USER_alarm 테이블
+        // 1. users_analysis 테이블 (의존성 없음)
         `
-        CREATE TABLE IF NOT EXISTS "user_alarm" (
+        CREATE TABLE IF NOT EXISTS "users_analysis" (
             user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_name VARCHAR(50),
             email VARCHAR(255),
             password VARCHAR(255),
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
             phone_number VARCHAR(20),
-            home_address VARCHAR(255)
+            home_address VARCHAR(255),
+            token VARCHAR(255)
         );
         `,
-        // 2. ESTATE_alarm 테이블
+        // 2. estates 테이블 (의존성 없음)
         `
-        CREATE TABLE IF NOT EXISTS "estate_alarm" (
+        CREATE TABLE IF NOT EXISTS "estates" (
             estate_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             estate_name VARCHAR(255),
             estate_address VARCHAR(255),
@@ -45,15 +46,40 @@ async function initializeDatabase() {
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
         `,
-        // 3. NOTI_INFO_alarm 테이블
+        // 3. interactions 테이블 (users_analysis, estates 참조)
         `
-        CREATE TABLE IF NOT EXISTS "noti_info_alarm" (
+        CREATE TABLE IF NOT EXISTS "interactions" (
+            interaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            
+            -- "users_analysis" 테이블 참조 (FK)
+            user_id UUID REFERENCES "users_analysis"(user_id) ON DELETE CASCADE,
+            
+            -- "estates" 테이블 참조 (FK)
+            estate_id UUID REFERENCES "estates"(estate_id) ON DELETE CASCADE,
+            
+            interaction_type VARCHAR(50) NOT NULL CHECK (interaction_type IN (
+                'isNotified', 
+                'analysisCompleted', 
+                'interested', 
+                'contractCompleted'
+            )),
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+        `,
+        // 4. noti_info 테이블 (users_analysis, estates 참조)
+        `
+        CREATE TABLE IF NOT EXISTS "noti_info" (
             alarm_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID REFERENCES user_alarm(user_id) ON DELETE CASCADE,
-            estate_id UUID REFERENCES estate_alarm(estate_id) ON DELETE CASCADE,
+            
+            -- "users_analysis" 테이블 참조 (FK)
+            user_id UUID REFERENCES "users_analysis"(user_id) ON DELETE CASCADE,
+            
+            -- "estates" 테이블 참조 (FK)
+            estate_id UUID REFERENCES "estates"(estate_id) ON DELETE CASCADE,
+            
             is_active BOOLEAN DEFAULT TRUE,
-            frequency VARCHAR(50) NOT NULL CHECK (frequency IN ('1 month', '3 months', '6 months', '1 year')),
-            last_notified_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            frequency VARCHAR(50),
+            last_notified_at TIMESTAMPTZ,
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
@@ -61,13 +87,13 @@ async function initializeDatabase() {
     ];
 
     try {
-        // 모든 쿼리를 순차적으로 실행
+        // 모든 쿼리를 순차적으로 실행 (순서 중요: FK 참조를 위해 부모 테이블 먼저 생성)
         for (const sql of createTableQueries) {
             await query(sql, []);
         }
         console.log('모든 데이터베이스 테이블이 성공적으로 준비되었습니다.');
     } catch (err) {
-        console.error('데이터베이스 테이블 초기화 중 치명적인 오류 발생:', err.message);
+        console.error('데이터베이스 테이블 초기화 중 오류 발생:', err.message);
         process.exit(1); 
     }
 }
@@ -88,11 +114,7 @@ notifyServer.get('/', (req, res) => {
     res.send('Hello from Express! (ALARM server v1)');
 });
 
-
-
-// notiInfoDB(alarmId, userId, estateId, isActive, frequency, lastNotifiedAt)
-
-// 주기적 동작, DB에서 조건에 해당하는 유저 정보 조회
+// 주기적 동작, DB에서 조건에 해당하는 유저 정보 조회, 테스툐용도라 매 시간 정각마다 동작하도록 함.
 nodeCron.schedule("0 * * * *", async () => { 
     console.log("알림 보낼 유저 탐색");
     const users = await findAlarmUser();
@@ -102,7 +124,7 @@ nodeCron.schedule("0 * * * *", async () => {
         console.log(`알림 발송 예정 유저 ${userLength}명. (Firebase 설정 대기 중)`);
         console.log("--- 알림 예정 유저 목록 ---");
         users.forEach((user, index) => {
-            // 사용자 ID, 구독 ID, FCM 토큰의 일부를 출력하여 정보를 확인합니다.
+            // 사용자 ID, 구독 ID를 출력하여 정보를 확인합니다.
             console.log(`[${index + 1}] UserID: ${user.user_id}, SubscriptionID: ${user.alarm_id}`);
         });
         console.log("---------------------------");
@@ -120,7 +142,7 @@ nodeCron.schedule("0 * * * *", async () => {
 async function findAlarmUser() { // 해당 코드 fcm_token SELECT는 삭제한 상태 -> 클라이언트 조율 후 구현 예정
     const findQuery = `
         SELECT alarm_id, user_id
-        FROM noti_info_alarm
+        FROM noti_info
         WHERE is_active = TRUE
         AND last_notified_at <= CURRENT_DATE - INTERVAL '1 month' * CASE
             WHEN frequency = '1 month' THEN 1
@@ -139,26 +161,23 @@ async function sendAlarm(users) {
 */
 
 async function updateLastNotifiedAt(users) {
-    // 1. users 배열에 데이터가 없으면 함수를 종료합니다.
     if (users.length === 0) return;
 
-    // 2. users 배열에서 userId만 추출합니다.
-    const userIds = users.map(user => user.user_id); 
+    // user_id 대신 alarm_id를 추출하도록 수정 -> 유저가 알림을 여러 개 신청할 수도 있기 때문
+    const alarmIds = users.map(user => user.alarm_id); 
 
-    // 3. userIds 배열을 SQL IN 절에 매개변수화된 형태로 사용하기 위해 $1, $2, ... 플레이스홀더를 만듭니다.
-    const placeholders = userIds.map((_, index) => `$${index + 1}`).join(',');
+    const placeholders = alarmIds.map((_, index) => `$${index + 1}`).join(',');
 
     const updateQuery = `
-        UPDATE noti_info_alarm
-        SET last_notified_at = CURRENT_DATE
-        WHERE user_id IN (${placeholders});
-    `;
+        UPDATE noti_info
+        SET last_notified_at = NOW() 
+        WHERE alarm_id IN (${placeholders});
+    `; // CURRENT_DATE -> NOW() 로 수정
 
-    // 4. 쿼리를 실행합니다. params 배열에 실제 userIds를 전달합니다.
-    await query(updateQuery, userIds);
+    // 🚨 userIds 대신 alarmIds 전달
+    await query(updateQuery, alarmIds);
 
-    // 5. 업데이트된 사용자 수를 로그로 출력합니다.
-    console.log(`${userIds.length}명의 last_notified_at이 업데이트되었습니다.`);
+    console.log(`${alarmIds.length}개의 알림(last_notified_at)이 업데이트되었습니다.`);
 }
 
 
@@ -177,7 +196,7 @@ notifyServer.get('/users/:userId/estates', async (req, res) => {
             params.isNotified = true;
         }
         if (isCompleted) {
-            params.isCompleted = true;
+            params.analysisCompleted = true;
         }
 
         const response = await axios.get(threatAnalysisServer, { params });
@@ -203,16 +222,16 @@ notifyServer.post('/users/subscription', async (req, res) => {
 
     try {
         // 이미 존재하는지 확인
-        const checkQuery = 'SELECT * FROM noti_info_alarm WHERE user_id = $1 AND estate_id = $2'; 
+        const checkQuery = 'SELECT * FROM noti_info WHERE user_id = $1 AND estate_id = $2'; 
         const checkResult = await query(checkQuery, [userId, estateId]);
 
         if (checkResult.rows.length > 0) {
             // 존재하면, isActive를 true로 업데이트
-            const updateQuery = 'UPDATE noti_info_alarm SET is_active = TRUE, frequency = $1, last_notified_at = NOW() WHERE user_id = $2 AND estate_id = $3';
+            const updateQuery = 'UPDATE noti_info SET is_active = TRUE, frequency = $1, last_notified_at = NOW() WHERE user_id = $2 AND estate_id = $3';
             await query(updateQuery, [frequency, userId, estateId]);
         } else {
             // 없다면 새로운 데이터 삽입
-            const insertQuery = 'INSERT INTO noti_info_alarm (user_id, estate_id, frequency) VALUES ($1, $2, $3)'; 
+            const insertQuery = 'INSERT INTO noti_info (user_id, estate_id, frequency, last_notified_at) VALUES ($1, $2, $3, NOW())'; 
             await query(insertQuery, [userId, estateId, frequency]);
         }
 
@@ -231,7 +250,7 @@ notifyServer.delete('/users/subscription/:subscriptionID', async (req, res) => {
     const subscriptionID = req.params.subscriptionID;
 
     // DB에서 alarm_id로 조회해서 isActive 상태를 false로 변경
-    const updateQuery = "UPDATE noti_info_alarm SET is_active = FALSE WHERE alarm_id = $1";
+    const updateQuery = "UPDATE noti_info SET is_active = FALSE WHERE alarm_id = $1";
     await query(updateQuery, [subscriptionID]);
 
     res.status(201).json({
@@ -246,7 +265,7 @@ notifyServer.patch('/users/subscription/:subscriptionID', async (req, res) => {
     const frequency = req.body.frequency;
 
     // DB에서 subscriptionID로 조회해서 frequency를 변경하고, lastNotifiedAt을 현재시각으로 변경
-    const updateQuery = "UPDATE noti_info_alarm SET frequency = $1, last_notified_at = NOW() WHERE alarm_id = $2";
+    const updateQuery = "UPDATE noti_info SET frequency = $1, last_notified_at = NOW() WHERE alarm_id = $2";
     await query(updateQuery, [frequency, subscriptionID]);
 
     res.status(201).json({

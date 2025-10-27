@@ -11,13 +11,13 @@ estatesCompareServer.use(express.json()); //
 const PORT = 3000;
 
 async function initializeDatabase() {
-    console.log('데이터베이스 테이블 초기화를 시작합니다...');
+    console.log('DB 테이블 초기화를 시작합니다.');
 
     // 테이블 생성 SQL 쿼리 목록
     const createTableQueries = [
         // 1. USER_analysis 테이블
         `
-        CREATE TABLE IF NOT EXISTS "user_analysis" (
+        CREATE TABLE IF NOT EXISTS "users_analysis" (
             user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_name VARCHAR(50),
             email VARCHAR(255),
@@ -27,9 +27,9 @@ async function initializeDatabase() {
             home_address VARCHAR(255)
         );
         `,
-        // 2. ESTATE_analysis 테이블
+        // 2. ESTATES 테이블
         `
-        CREATE TABLE IF NOT EXISTS "estate_analysis" (
+        CREATE TABLE IF NOT EXISTS "estates" (
             estate_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             estate_name VARCHAR(255),
             estate_address VARCHAR(255),
@@ -37,9 +37,9 @@ async function initializeDatabase() {
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
         `,
-        // 3. ESTATE_ANALYSIS_analysis 테이블
+        // 3. ANALYSIS 테이블
         `
-        CREATE TABLE IF NOT EXISTS "estate_analysis_analysis" (
+        CREATE TABLE IF NOT EXISTS "analysis" (
             analysis_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             estate_id UUID REFERENCES estate_analysis(estate_id) ON DELETE CASCADE,
             risk_score INT,
@@ -49,18 +49,18 @@ async function initializeDatabase() {
             part_b_analysis JSONB
         );
         `,
-        // 4. THREAT_analysis (정적) 테이블
+        // 4. THREATS (정적) 테이블
         `
-        CREATE TABLE IF NOT EXISTS "threat_analysis" (
+        CREATE TABLE IF NOT EXISTS "threats" (
             threat_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             threat_name VARCHAR(50) NOT NULL,
             contents TEXT,
             category VARCHAR(10) NOT NULL CHECK (category IN ('title', 'a', 'b'))
         );
         `,
-        // 5. USER_INTERACTION_analysis 테이블
+        // 5. INTERACTIONS 테이블
         `
-        CREATE TABLE IF NOT EXISTS "user_interaction_analysis" (
+        CREATE TABLE IF NOT EXISTS "interaction" (
             interaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_id UUID REFERENCES user_analysis(user_id) ON DELETE CASCADE,
             estate_id UUID REFERENCES estate_analysis(estate_id) ON DELETE CASCADE,
@@ -78,7 +78,7 @@ async function initializeDatabase() {
         }
         console.log('모든 데이터베이스 테이블이 성공적으로 준비되었습니다.');
     } catch (err) {
-        console.error('데이터베이스 테이블 초기화 중 치명적인 오류 발생:', err.message);
+        console.error('데이터베이스 테이블 초기화 중 오류 발생:', err.message);
         // 테이블 생성에 실패하면 서버를 시작할 수 없으므로 프로세스 종료
         process.exit(1);
     }
@@ -100,6 +100,59 @@ estatesCompareServer.get('/', (req, res) => {
     res.send('Hello from Express! (comparative-analysis server v1)');
 });
 
+
+
+// 주소 검색 API -> 추후 라우터로 분리 예정
+const confmKey = "devU01TX0FVVEgyMDI1MDkyNTEwMTgzOTExNjI2NDU="
+
+estatesCompareServer.get('/estates/search', async (req, res) => {
+    const keyword = req.query.keyword;
+    if (!keyword) {
+        return res.status(400).json({ message: '검색할 키워드를 입력해주세요.' });
+    }
+    const currentPage = 1;
+    const countPerPage = 10;
+    const searchAddressURL = "https://business.juso.go.kr/addrlink/addrLinkApi.do"
+    const params = { // 요청시 쿼리 파라미터를 넘기면 자동으로 ?와 &와 연결해서 할당
+        currentPage: 1,
+        countPerPage: 10,
+        keyword: keyword,
+        confmKey: confmKey,
+        hstryYn: 'Y',
+        firstSort: 'road',
+        resultType: 'json'
+    };
+
+    const apiResponse = await axios.get(searchAddressURL, { // 두번째 인자는 옵션, 여러 옵션이 들어갈 수 있기 때문에 객체 리터럴
+        params: params
+    });
+
+    console.log(apiResponse);
+
+    const totalCount = apiResponse.data.results.common.totalCount;
+    const addressData = apiResponse.data.results.juso || []; 
+    const filteredAddressData = addressData.map(estate => {
+        return {
+            roadAddr: estate.roadAddr,
+            zipNo: estate.zipNo
+        };
+    });
+
+    console.log("검색 결과 매물 수 : " + totalCount);
+    console.log(filteredAddressData);
+
+    if (filteredAddressData.length === 0) {
+        return res.status(200).json({
+            message: "검색 결과가 없습니다.",
+            data: []
+        });
+    }
+
+    res.status(200).json({
+        message: "주소 검색 결과를 성공적으로 가져왔습니다.",
+        data: filteredAddressData
+    });
+})
 
 
 // 매물 위험도 비교 서비스

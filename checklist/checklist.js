@@ -11,72 +11,87 @@ checkListServer.use(express.json());
 const PORT = 3000;
 
 async function initializeDatabase() {
-    console.log('🔄 데이터베이스 테이블 초기화를 시작합니다...');
-    
-    // 테이블 생성 SQL 쿼리 목록 (총 4개 테이블)
+    console.log('DB 테이블 초기화를 시작합니다.');
+
+  // 테이블 생성 SQL 쿼리 목록 (총 5개 테이블)
     const createTableQueries = [
-        // 1. USER_checklist 테이블
-        `
-        CREATE TABLE IF NOT EXISTS "user_checklist" (
-            user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_name VARCHAR(50),
-            email VARCHAR(255),
-            password VARCHAR(255),
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-            phone_number VARCHAR(20),
-            home_address VARCHAR(255)
-        );
-        `,
-        // 2. ESTATE_checklist 테이블
-        `
-        CREATE TABLE IF NOT EXISTS "estate_checklist" (
-            estate_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            estate_name VARCHAR(255),
-            estate_address VARCHAR(255),
-            zip_no VARCHAR(10),
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-        );
-        `,
-        // 3. THREAT_analysis 테이블 (정적 테이블 - USER_CHECKLIST_checklist보다 먼저 생성되어야 함)
-        `
-        CREATE TABLE IF NOT EXISTS "threat_analysis" (
-            threat_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            threat_name VARCHAR(50) NOT NULL,
-            contents TEXT,
-            category VARCHAR(10) NOT NULL CHECK (category IN ('title', 'a', 'b'))
-        );
-        `,
-        // 4. USER_CHECKLIST_checklist 테이블 (THREAT_analysis 참조)
-        `
-        CREATE TABLE IF NOT EXISTS "user_checklist_checklist" (
-            user_checklist_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            
-            -- user_checklist.user_id 참조
-            user_id UUID REFERENCES user_checklist(user_id) ON DELETE CASCADE,
-            
-            -- estate_checklist.estate_id 참조
-            estate_id UUID REFERENCES estate_checklist(estate_id) ON DELETE CASCADE,
-            
-            -- threat_analysis.threat_id 참조 추가
-            threat_id UUID REFERENCES threat_analysis(threat_id), 
-            
-            -- 체크리스트의 단계 분류
-            category VARCHAR(20) NOT NULL CHECK (category IN ('analysis', 'before_contract', 'contract_day', 'after_contract', 'after_expiration')),
-            is_checked BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-        );
-        `
+    // 1. users_analysis 테이블 (의존성 없음)
+    `
+    CREATE TABLE IF NOT EXISTS "users_analysis" (
+        user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_name VARCHAR(50),
+        email VARCHAR(255),
+        password VARCHAR(255),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        phone_number VARCHAR(20),
+        home_address VARCHAR(255),
+        token VARCHAR(255)
+    );
+    `,
+    // 2. estates 테이블 (의존성 없음)
+    `
+    CREATE TABLE IF NOT EXISTS "estates" (
+        estate_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        estate_name VARCHAR(255),
+        estate_address VARCHAR(255),
+        zip_no VARCHAR(10),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    `,
+    // 3. threats 테이블 (정적 테이블, 의존성 없음)
+    `
+    CREATE TABLE IF NOT EXISTS "threats" (
+        threat_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        threat_name VARCHAR(50),
+        contents TEXT,
+        category VARCHAR(10) NOT NULL CHECK (category IN ('title', 'a', 'b'))
+    );
+    `,
+    // 4. analysis 테이블 (estates 참조)
+    `
+    CREATE TABLE IF NOT EXISTS "analysis" (
+        analysis_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        -- "estates" 테이블 참조 (FK)
+        estate_id UUID REFERENCES "estates"(estate_id) ON DELETE CASCADE,
+        risk_score INT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        title_section_analysis JSONB,
+        part_a_analysis JSONB,
+        part_b_analysis JSONB
+    );
+    `,
+    // 5. checklists 테이블 (users_analysis, estates, threats 참조)
+    `
+    CREATE TABLE IF NOT EXISTS "checklists" (
+        user_checklist_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        -- "users_analysis" 테이블 참조 (FK)
+        user_id UUID REFERENCES "users_analysis"(user_id) ON DELETE CASCADE,
+        -- "estates" 테이블 참조 (FK)
+        estate_id UUID REFERENCES "estates"(estate_id) ON DELETE CASCADE,
+        -- "threats" 테이블 참조 (FK)
+        threat_id UUID REFERENCES "threats"(threat_id) ON DELETE CASCADE,
+        category VARCHAR(50) NOT NULL CHECK (category IN (
+            'analysis', 
+            'before_contract', 
+            'contract_day', 
+            'after_contract', 
+            'after_expiration'
+        )),
+        is_checked BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    `
     ];
 
     try {
-        // 모든 쿼리를 순차적으로 실행
-        for (const sql of createTableQueries) {
-            await query(sql, []);
-        }
-        console.log('모든 데이터베이스 테이블이 성공적으로 준비되었습니다.');
+    // 모든 쿼리를 순차적으로 실행 (순서 중요: FK 참조를 위해 부모 테이블 먼저 생성)
+    for (const sql of createTableQueries) {
+        await query(sql, []);
+    }
+    console.log('모든 데이터베이스 테이블이 성공적으로 준비되었습니다.');
     } catch (err) {
-        console.error('데이터베이스 테이블 초기화 중 치명적인 오류 발생:', err.message);
-        process.exit(1); 
+    console.error('데이터베이스 테이블 초기화 중 오류 발생:', err.message);
+    process.exit(1);
     }
 }
 
@@ -97,8 +112,8 @@ checkListServer.get('/', (req, res) => {
 });
 
 
-// 위험 분석 후 위험 분석 DB와 체크리스트 DB에 INSERT 하고,
-// 체크리스트 DB의 USER_CHECKLIST 테이블 조회
+// 위험 분석 후 DB에 INSERT 하고,
+// DB의 USER_CHECKLIST_checklist 테이블 조회
 // 예시 URL host/users/1111/123/checklist?isChecked=true&category=analysis
 checkListServer.get('/users/:userId/:estateId/checklist', async (req, res) => {
     try {
