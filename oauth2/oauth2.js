@@ -19,7 +19,7 @@ const client = new OAuth2Client(
   process.env.GOOGLE_REDIRECT_URI
 );
 
-app.post('/oauth2', async (req, res) => {
+app.post('/', async (req, res) => {
   const { code } = req.body;
   if (!code) {
     return res.status(400).json({ message: 'Need auth code.' });
@@ -45,7 +45,7 @@ app.post('/oauth2', async (req, res) => {
 
     // 4. 우리 서비스의 JWT 생성
     const payload = {
-      id: dbUser.sub, // 'sub'는 사용자의 고유 ID입니다.
+      id: dbUser.sub, // 'sub'는 사용자의 고유 ID
       email: dbUser.email,
     };
     const ourToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30d' });
