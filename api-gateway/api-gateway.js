@@ -19,11 +19,11 @@ app.use(cors(corsOptions));
 // [설정] 라우팅할 서비스 목록
 const services = {
   '/oauth2': { target: 'http://service-oauth2.voyage-app-02' },
-  '/alarm': { target: 'http://alarm.voyage-app-02' },
-  '/risk-analysis': { target: 'http://risk-analysis.voyage-app-02' },
-  '/community': { target: 'http://community.voyage-app-02' },
-  '/comparative-analysis': { target: 'http://comparative-analysis.voyage-app-02' },
-  '/checklist': { target: 'http://checklist.voyage-app-02' }
+  '/alarm': { target: 'http://service-alarm.voyage-app-02' },
+  '/risk-analysis': { target: 'http://service-risk-analysis.voyage-app-02' },
+  '/community': { target: 'http://service-community.voyage-app-02' },
+  '/comparative-analysis': { target: 'http://service-comparative-analysis.voyage-app-02' },
+  '/checklist': { target: 'http://service-checklist.voyage-app-02' }
 };
 
 // [설정] JWT 인증이 필요 없는 공개 경로 목록
