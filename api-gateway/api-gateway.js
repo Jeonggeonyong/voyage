@@ -45,21 +45,29 @@ const authenticateJWT = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('JWT 검증 성공:', decoded);
+    console.log('JWT 검증 성공 (payload):', decoded); // decoded.id는 Google 'sub'
 
-    // --- [추가] DB에서 실제 사용자 확인 ---
-    const { rows } = await query('SELECT id FROM users WHERE id = $1', [decoded.id]);
+    // --- [수정] DB에서 실제 사용자 확인 ---
+    // decoded.id (Google 'sub' 값)를 사용해 'sub' 컬럼에서 사용자를 찾습니다.
+    // (참고: users 테이블에 'sub' 컬럼이 있어야 합니다)
+    const { rows } = await query('SELECT id FROM users WHERE sub = $1', [decoded.id]);
 
     if (rows.length === 0) {
-      console.warn(`Authentication Error: User ID ${decoded.id} not found in DB.`);
+      // 'sub' 컬럼 기준으로 사용자를 찾지 못한 경우
+      console.warn(`Authentication Error: User (sub) ${decoded.id} not found in DB.`);
       return res.status(401).json({ message: 'Unauthorized. User not found.' });
     }
-    // --- [추가] 끝 ---
+    // --- [수정] 끝 ---
 
-    req.headers['x-user-id'] = decoded.id;
+    // [수정]
+    // 다운스트림 서비스(alarm, community 등)에는 'decoded.id'(Google sub)가 아닌,
+    // 우리 DB의 고유 PK인 'rows[0].id' (예: 1, 2, 3...)를 전달합니다.
+    const dbUserId = rows[0].id;
+    req.headers['x-user-id'] = dbUserId;
     req.headers['x-user-email'] = decoded.email;
     next();
   } catch (error) {
+    // JWT 만료 또는 서명 오류
     return res.status(403).json({ message: 'Forbidden.' });
   }
 };
