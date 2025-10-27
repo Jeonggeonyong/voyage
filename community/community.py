@@ -6,19 +6,19 @@ from flask import Flask, request, jsonify
 load_dotenv()
 
 def init_db():
-    t1 = """CREATE TABLE IF NOT EXISTS users (
+    t1 = """CREATE TABLE IF NOT EXISTS users_community (
         id SERIAL PRIMARY KEY,
         username VARCHAR(50) UNIQUE NOT NULL
     );"""
     t2 = """CREATE TABLE IF NOT EXISTS posts (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
+        user_id INTEGER REFERENCES users_community(id),
         title VARCHAR(255) NOT NULL,
         content TEXT DEFAULT ''
     );"""
     t3 = """CREATE TABLE IF NOT EXISTS comments (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
+        user_id INTEGER REFERENCES users_community(id),
         post_id INTEGER REFERENCES posts(id),
         content TEXT DEFAULT ''
     );"""
@@ -57,7 +57,7 @@ def users_main():
 
     cur = conn.cursor()
     if request.method == "GET":
-        cur.execute("SELECT id, username FROM users")
+        cur.execute("SELECT id, username FROM users_community")
         rows = cur.fetchall()
         data = []
         for r in rows:
@@ -69,7 +69,7 @@ def users_main():
     elif request.method == "POST":
         data = request.json
         try:
-            cur.execute(f"INSERT INTO users (username) VALUES ({data['username']});")
+            cur.execute(f"INSERT INTO users_community (username) VALUES ({data['username']});")
             conn.commit()
             return jsonify({"code": 0}), 200
         except Exception as e:
@@ -144,7 +144,7 @@ def get_user(userID):
         
     cur = conn.cursor()
     if request.method == "GET":
-        cur.execute(f"SELECT id, username FROM users WHERE id = {userID}")
+        cur.execute(f"SELECT id, username FROM users_community WHERE id = {userID}")
         row = cur.fetchone()
         if row is None:
             return jsonify({"code": 1}), 404
