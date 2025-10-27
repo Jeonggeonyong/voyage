@@ -12,7 +12,7 @@ app.use(express.json());
 // 테스트 웹페이지의 출처를 명시적으로 허용합니다.
 const corsOptions = {
   origin: 'http://localhost:5500', // Live Server의 기본 주소
-  optionsSuccessStatus: 200 
+  optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions)); // CORS 미들웨어 적용
 // --- CORS 설정 끝 ---
