@@ -9,12 +9,11 @@ const app = express();
 app.use(express.json());
 
 // --- CORS 설정 ---
-// 테스트 웹페이지의 출처를 명시적으로 허용합니다.
 const corsOptions = {
-  origin: 'http://localhost:5500', // Live Server의 기본 주소
+  origin: 'http://localhost:5500',
   optionsSuccessStatus: 200
 };
-app.use(cors(corsOptions)); // CORS 미들웨어 적용
+app.use(cors(corsOptions));
 // --- CORS 설정 끝 ---
 
 // [설정] 라우팅할 서비스 목록
@@ -31,7 +30,6 @@ const services = {
 const publicRoutes = ['/oauth2'];
 
 // 인증 미들웨어
-// [수정] DB 조회를 위해 async 함수로 변경
 const authenticateJWT = async (req, res, next) => {
   const isPublic = publicRoutes.some(route => req.path.startsWith(route));
   if (isPublic) {
@@ -45,23 +43,19 @@ const authenticateJWT = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('JWT 검증 성공 (payload):', decoded); // decoded.id는 Google 'sub'
+    console.log('JWT 검증 성공 (payload):', decoded); // decoded.id는 Google ID
 
-    // --- [수정] DB에서 실제 사용자 확인 ---
-    // decoded.id (Google 'sub' 값)를 사용해 'sub' 컬럼에서 사용자를 찾습니다.
-    // (참고: users 테이블에 'sub' 컬럼이 있어야 합니다)
-    const { rows } = await query('SELECT id FROM users WHERE sub = $1', [decoded.id]);
+    // --- [최종 수정] ---
+    // decoded.id (Google ID)를 사용해 'google_id' 컬럼에서 사용자를 찾습니다.
+    const { rows } = await query('SELECT id FROM users WHERE google_id = $1', [decoded.id]);
+    // --- [최종 수정 끝] ---
 
     if (rows.length === 0) {
-      // 'sub' 컬럼 기준으로 사용자를 찾지 못한 경우
-      console.warn(`Authentication Error: User (sub) ${decoded.id} not found in DB.`);
+      console.warn(`Authentication Error: User (google_id) ${decoded.id} not found in DB.`);
       return res.status(401).json({ message: 'Unauthorized. User not found.' });
     }
-    // --- [수정] 끝 ---
 
-    // [수정]
-    // 다운스트림 서비스(alarm, community 등)에는 'decoded.id'(Google sub)가 아닌,
-    // 우리 DB의 고유 PK인 'rows[0].id' (예: 1, 2, 3...)를 전달합니다.
+    // 마이크로서비스에는 DB의 PK (rows[0].id)를 전달
     const dbUserId = rows[0].id;
     req.headers['x-user-id'] = dbUserId;
     req.headers['x-user-email'] = decoded.email;
@@ -85,12 +79,11 @@ app.use('/', async (req, res) => {
       console.log(`Forwarding request for '${req.originalUrl}' to host '${targetUrl.hostname}'`);
 
       try {
-        // [수정] URL에서 prefix(예: /community)를 제거합니다.
         const newPath = req.originalUrl.substring(prefix.length);
 
         const response = await axios({
           method: req.method,
-          url: `${targetUrl.origin}${newPath}`, // [수정] newPath 사용
+          url: `${targetUrl.origin}${newPath}`,
           data: req.body,
           headers: { ...req.headers, host: targetUrl.hostname },
           responseType: 'stream',
