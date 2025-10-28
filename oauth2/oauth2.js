@@ -45,7 +45,7 @@ app.post('/', async (req, res) => {
     // dbUser는 { id, google_id, email, full_name, ... } 형태
     // 3-1. users_analysis 테이블에 데이터 추가 (ID, 이름)
     // dbUser.id는 users 테이블의 PK이며, 이를 users_analysis의 user_id로 사용
-    await checkInUserAnalysis(dbUser.id, dbUser.full_name);
+    await checkInUserAnalysis(dbUser.google_id, dbUser.full_name);
 
     // 4. 우리 서비스의 JWT 생성 
     const payload = {
