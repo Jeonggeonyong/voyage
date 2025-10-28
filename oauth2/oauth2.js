@@ -4,8 +4,10 @@ const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const cors = require('cors');
 
-// './userService.js' 파일에서 findOrCreateUser 함수를 가져옵니다.
+// './userService.js' 파일에서 findOrCreateUser 함수를 가져옴
 const { findOrCreateUser } = require('./userService');
+// './analysisService.js' 파일에서 함수를 가져옴
+const { checkInUserAnalysis } = require('./analysisService');
 
 const app = express();
 app.use(express.json());
@@ -18,7 +20,7 @@ const client = new OAuth2Client(
   process.env.GOOGLE_REDIRECT_URI
 );
 
-// API 게이트웨이의 /oauth2/ 경로를 통해 이 라우터가 호출됩니다.
+// API 게이트웨이의 /oauth2/ 경로를 통해 이 라우터가 호출
 app.post('/', async (req, res) => {
   const { code } = req.body;
   if (!code) {
@@ -40,7 +42,10 @@ app.post('/', async (req, res) => {
     // 3. DB에서 사용자 조회 또는 생성 (userService.js 사용)
     // googleUser의 sub가 'google_id' 컬럼에 저장됩니다.
     const dbUser = await findOrCreateUser(googleUser);
-    // dbUser는 { id, google_id, email, full_name, ... } 형태입니다.
+    // dbUser는 { id, google_id, email, full_name, ... } 형태
+    // 3-1. users_analysis 테이블에 데이터 추가 (ID, 이름)
+    // dbUser.id는 users 테이블의 PK이며, 이를 users_analysis의 user_id로 사용
+    await checkInUserAnalysis(dbUser.id, dbUser.full_name);
 
     // 4. 우리 서비스의 JWT 생성 
     const payload = {
