@@ -52,7 +52,7 @@ async function initializeDatabase() {
     `
     CREATE TABLE IF NOT EXISTS checklists (
         checklist_id SERIAL PRIMARY KEY,
-        threat_id INT REFERENCES "threats"(threat_id) ON DELETE CASCADE,
+        threat_id INT REFERENCES threats(threat_id) ON DELETE CASCADE,
         text TEXT
     );
     `,
@@ -60,10 +60,10 @@ async function initializeDatabase() {
     `
     CREATE TABLE IF NOT EXISTS analysis (
         analysis_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    -- "estates" 테이블 참조 (FK)
-        estate_id UUID REFERENCES "estates"(estate_id) ON DELETE CASCADE,
-    -- [추가25/10/28] "users_analysis" 테이블 참조 (FK)
-        user_id UUID REFERENCES "users_analysis"(user_id) ON DELETE CASCADE,
+    -- estates 테이블 참조 (FK)
+        estate_id UUID REFERENCES estates(estate_id) ON DELETE CASCADE,
+    -- [추가25/10/28] users_analysis 테이블 참조 (FK)
+        user_id UUID REFERENCES users_analysis(user_id) ON DELETE CASCADE,
         risk_score INT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         title_section_analysis JSONB,
@@ -75,14 +75,14 @@ async function initializeDatabase() {
     `
     CREATE TABLE IF NOT EXISTS user_checklists (
         user_checklist_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),     
-        -- "checklists" (static) 테이블 참조 (FK)
-        checklist_id INT REFERENCES "checklists"(checklist_id) ON DELETE CASCADE,      
-        -- "users_analysis" 테이블 참조 (FK)
-        user_id UUID REFERENCES "users_analysis"(user_id) ON DELETE CASCADE,    
-        -- "estates" 테이블 참조 (FK)
-        estate_id UUID REFERENCES "estates"(estate_id) ON DELETE CASCADE,  
-        -- "threats" 테이블 참조 (FK)
-        threat_id INT REFERENCES "threats"(threat_id) ON DELETE CASCADE,   
+        -- checklists (static) 테이블 참조 (FK)
+        checklist_id INT REFERENCES checklists(checklist_id) ON DELETE CASCADE,      
+        -- users_analysis 테이블 참조 (FK)
+        user_id UUID REFERENCES users_analysis(user_id) ON DELETE CASCADE,    
+        -- estates 테이블 참조 (FK)
+        estate_id UUID REFERENCES estates(estate_id) ON DELETE CASCADE,  
+        -- threats 테이블 참조 (FK)
+        threat_id INT REFERENCES threats(threat_id) ON DELETE CASCADE,   
         category VARCHAR(50) NOT NULL CHECK (category IN (
             'analysis', 
             'before_contract', 

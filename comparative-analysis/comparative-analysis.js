@@ -17,7 +17,7 @@ async function initializeDatabase() {
     const createTableQueries = [
         // 1. users_analysis 테이블
         `
-        CREATE TABLE IF NOT EXISTS "users_analysis" (
+        CREATE TABLE IF NOT EXISTS users_analysis (
             user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_name VARCHAR(50),
             email VARCHAR(255),
@@ -30,7 +30,7 @@ async function initializeDatabase() {
         `,
         // 2. ESTATES 테이블
         `
-        CREATE TABLE IF NOT EXISTS "estates" (
+        CREATE TABLE IF NOT EXISTS estates (
             estate_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             estate_name VARCHAR(255),
             estate_address VARCHAR(255),
@@ -40,7 +40,7 @@ async function initializeDatabase() {
         `,
         // 3. THREATS (정적) 테이블 [수정됨]
         `
-        CREATE TABLE IF NOT EXISTS "threats" (
+        CREATE TABLE IF NOT EXISTS threats (
             threat_id SERIAL PRIMARY KEY,
             threat_name VARCHAR(50) NOT NULL,
             contents TEXT,
@@ -50,10 +50,10 @@ async function initializeDatabase() {
         `,
         // 4. ANALYSIS 테이블
         `
-        CREATE TABLE IF NOT EXISTS "analysis" (
+        CREATE TABLE IF NOT EXISTS analysis (
             analysis_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            estate_id UUID REFERENCES "estates"(estate_id) ON DELETE CASCADE,
-            user_id UUID REFERENCES "users_analysis"(user_id) ON DELETE CASCADE,
+            estate_id UUID REFERENCES estates(estate_id) ON DELETE CASCADE,
+            user_id UUID REFERENCES users_analysis(user_id) ON DELETE CASCADE,
             risk_score INT,
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
             title_section_analysis JSONB,
@@ -63,10 +63,10 @@ async function initializeDatabase() {
         `,
         // 5. INTERACTIONS 테이블
         `
-        CREATE TABLE IF NOT EXISTS "interactions" (
+        CREATE TABLE IF NOT EXISTS interactions (
             interaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID REFERENCES "users_analysis"(user_id) ON DELETE CASCADE,
-            estate_id UUID REFERENCES "estates"(estate_id) ON DELETE CASCADE,
+            user_id UUID REFERENCES users_analysis(user_id) ON DELETE CASCADE,
+            estate_id UUID REFERENCES estates(estate_id) ON DELETE CASCADE,
             
             interaction_type VARCHAR(50) NOT NULL CHECK (interaction_type IN ('isNotified', 'analysisCompleted', 'interested', 'contractCompleted')),
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -189,9 +189,9 @@ estatesCompareServer.get('/users/:userId/estates', async (req, res) => {
             ui.interaction_type,
             e.estate_address  -- estate_analysis 테이블에서 주소 정보 추가
         FROM
-            "interactions" ui
+            interactions ui
         JOIN -- INNER JOIN을 사용하여 두 테이블에 모두 존재하는 레코드만 가져옵니다.
-            "estates" e ON ui.estate_id = e.estate_id
+            estates e ON ui.estate_id = e.estate_id
         WHERE
             ui.user_id = $1
 `;
@@ -267,7 +267,7 @@ estatesCompareServer.get('/users/:userId/comparison', async (req, res) => {
                 part_a_analysis,
                 part_b_analysis
             FROM
-                "analysis"
+                analysis
             WHERE
                 estate_id = $1
                 AND user_id = $2
