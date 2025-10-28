@@ -15,7 +15,7 @@ async function initializeDatabase() {
 
     // 테이블 생성 SQL 쿼리 목록
     const createTableQueries = [
-        // 1. USER_analysis 테이블
+        // 1. users_analysis 테이블
         `
         CREATE TABLE IF NOT EXISTS "users_analysis" (
             user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -24,7 +24,8 @@ async function initializeDatabase() {
             password VARCHAR(255),
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
             phone_number VARCHAR(20),
-            home_address VARCHAR(255)
+            home_address VARCHAR(255),
+            token VARCHAR(255)
         );
         `,
         // 2. ESTATES 테이블
@@ -37,11 +38,22 @@ async function initializeDatabase() {
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
         `,
-        // 3. ANALYSIS 테이블
+        // 3. THREATS (정적) 테이블 [수정됨]
+        `
+        CREATE TABLE IF NOT EXISTS "threats" (
+            threat_id SERIAL PRIMARY KEY,
+            threat_name VARCHAR(50) NOT NULL,
+            contents TEXT,
+            risk_level INT,
+            category VARCHAR(10) NOT NULL CHECK (category IN ('title', 'a', 'b', 'extra'))
+        );
+        `,
+        // 4. ANALYSIS 테이블
         `
         CREATE TABLE IF NOT EXISTS "analysis" (
             analysis_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            estate_id UUID REFERENCES estate_analysis(estate_id) ON DELETE CASCADE,
+            estate_id UUID REFERENCES "estates"(estate_id) ON DELETE CASCADE,
+            user_id UUID REFERENCES "users_analysis"(user_id) ON DELETE CASCADE,
             risk_score INT,
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
             title_section_analysis JSONB,
@@ -49,21 +61,13 @@ async function initializeDatabase() {
             part_b_analysis JSONB
         );
         `,
-        // 4. THREATS (정적) 테이블
-        `
-        CREATE TABLE IF NOT EXISTS "threats" (
-            threat_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            threat_name VARCHAR(50) NOT NULL,
-            contents TEXT,
-            category VARCHAR(10) NOT NULL CHECK (category IN ('title', 'a', 'b'))
-        );
-        `,
         // 5. INTERACTIONS 테이블
         `
-        CREATE TABLE IF NOT EXISTS "interaction" (
+        CREATE TABLE IF NOT EXISTS "interactions" (
             interaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID REFERENCES user_analysis(user_id) ON DELETE CASCADE,
-            estate_id UUID REFERENCES estate_analysis(estate_id) ON DELETE CASCADE,
+            user_id UUID REFERENCES "users_analysis"(user_id) ON DELETE CASCADE,
+            estate_id UUID REFERENCES "estates"(estate_id) ON DELETE CASCADE,
+            
             interaction_type VARCHAR(50) NOT NULL CHECK (interaction_type IN ('isNotified', 'analysisCompleted', 'interested', 'contractCompleted')),
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
@@ -71,18 +75,17 @@ async function initializeDatabase() {
     ];
 
     try {
-        // 모든 쿼리를 순차적 또는 병렬로 실행
+        // 모든 쿼리를 순차적으로 실행
         for (const sql of createTableQueries) {
-            // query 함수를 사용하여 쿼리 실행
             await query(sql, []);
         }
         console.log('모든 데이터베이스 테이블이 성공적으로 준비되었습니다.');
     } catch (err) {
         console.error('데이터베이스 테이블 초기화 중 오류 발생:', err.message);
-        // 테이블 생성에 실패하면 서버를 시작할 수 없으므로 프로세스 종료
         process.exit(1);
     }
 }
+
 // DB 초기화 후 서버 리스닝 시작
 initializeDatabase().then(() => {
     // 0.0.0.0으로 호스트를 지정해야 Docker 컨테이너 외부에서 접근이 가능합니다.
@@ -106,6 +109,7 @@ estatesCompareServer.get('/', (req, res) => {
 const confmKey = "devU01TX0FVVEgyMDI1MDkyNTEwMTgzOTExNjI2NDU="
 
 estatesCompareServer.get('/estates/search', async (req, res) => {
+    try{
     const keyword = req.query.keyword;
     if (!keyword) {
         return res.status(400).json({ message: '검색할 키워드를 입력해주세요.' });
@@ -152,7 +156,12 @@ estatesCompareServer.get('/estates/search', async (req, res) => {
         message: "주소 검색 결과를 성공적으로 가져왔습니다.",
         data: filteredAddressData
     });
-})
+}
+catch(err){
+    console.error("주소 API 조회 중 오류 발생:", err.message);
+    res.status(500).json({ message: "주소 검색 중 서버 오류가 발생했습니다." });
+}
+});
 
 
 // 매물 위험도 비교 서비스
@@ -180,9 +189,9 @@ estatesCompareServer.get('/users/:userId/estates', async (req, res) => {
             ui.interaction_type,
             e.estate_address  -- estate_analysis 테이블에서 주소 정보 추가
         FROM
-            user_interaction_analysis ui
+            "interactions" ui
         JOIN -- INNER JOIN을 사용하여 두 테이블에 모두 존재하는 레코드만 가져옵니다.
-            estate_analysis e ON ui.estate_id = e.estate_id
+            "estates" e ON ui.estate_id = e.estate_id
         WHERE
             ui.user_id = $1
 `;
@@ -223,7 +232,8 @@ estatesCompareServer.get('/users/:userId/estates', async (req, res) => {
             estateId: estate.estate_id,
             userId: estate.user_id,
             createdAt: estate.created_at,
-            //interactionType: estate.interaction_type
+            interactionType: estate.interaction_type,
+            estateAddress: estate.estate_address
         }));
 
         res.status(200).json({
@@ -257,9 +267,10 @@ estatesCompareServer.get('/users/:userId/comparison', async (req, res) => {
                 part_a_analysis,
                 part_b_analysis
             FROM
-                estate_analysis_analysis
+                "analysis"
             WHERE
                 estate_id = $1
+                AND user_id = $2
             ORDER BY
                 created_at DESC
             LIMIT 1;
@@ -267,9 +278,9 @@ estatesCompareServer.get('/users/:userId/comparison', async (req, res) => {
 
         // 💡 수정 7: pool.query, db.query 대신 가져온 query 함수 사용 및 Promise.all로 병렬 처리
         const [result1, result2] = await Promise.all([
-            query(estateAnalysisQuery, [estate1Id]),
-            query(estateAnalysisQuery, [estate2Id])
-        ]);
+        query(estateAnalysisQuery, [estate1Id, userId]), // userId 추가
+        query(estateAnalysisQuery, [estate2Id, userId])  // userId 추가
+    ]);
 
         // 두 번째 매물(estate2Id)의 최신 데이터 조회
         // 💡 수정: 중복 쿼리 정의 제거 (estateAnalysisQuery로 대체됨)
