@@ -247,7 +247,7 @@ checkListServer.get('/', (req, res) => {
 });
 
 
-// 체크리스트 초기화 API(상완 요청)
+// 체크리스트 초기화 API(위험분석 서버에서 요청함)
 checkListServer.post('/users/:userId/:estateId/checklists/init', async (req, res) => {
     const { userId, estateId } = req.params;
 

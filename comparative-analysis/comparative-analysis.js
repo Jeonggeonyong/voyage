@@ -160,8 +160,7 @@ catch(err){
 });
 
 
-// 매물 위험도 비교 서비스
-
+// 매물 목록 조회 서비스
 // analysisDB/USER_INTERACTION 테이블에서 원하는 매물 목록 조회
 // URL 예시 host/users/123/estates?analysisCompleted=true
 estatesCompareServer.get('/users/:userId/estates', async (req, res) => {
@@ -233,7 +232,7 @@ estatesCompareServer.get('/users/:userId/estates', async (req, res) => {
         }));
 
         res.status(200).json({
-            message: "분석 완료 매물 목록을 성공적으로 가져왔습니다.",
+            message: "매물 목록을 성공적으로 가져왔습니다.",
             data: filteredEstates
         });
 

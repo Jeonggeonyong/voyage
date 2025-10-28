@@ -184,7 +184,7 @@ notifyServer.get('/users/:userId/estates', async (req, res) => {
     const isNotified = req.query.isNotified === 'true';
     const analysisCompleted = req.query.analysisCompleted === 'true';
 
-    const threatAnalysisServer = "http://service-comparative-analysis.voyage-app-02" + userId + "/estates";
+    const threatAnalysisServer = "http://service-comparative-analysis.voyage-app-02/users" + userId + "/estates";
 
     try {
         const params = {};
@@ -200,7 +200,7 @@ notifyServer.get('/users/:userId/estates', async (req, res) => {
 
         res.status(200).json({
             estateAddress: estateInfo,
-            message: "성공적으로 매물을 조회했습니다."
+            message: "매물 목록을 성공적으로 가져왔습니다."
         });
 
     } catch (error) {
