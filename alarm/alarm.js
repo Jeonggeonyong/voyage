@@ -28,11 +28,7 @@ async function initializeDatabase() {
         CREATE TABLE IF NOT EXISTS users_analysis (
             user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_name VARCHAR(50),
-            email VARCHAR(255),
-            password VARCHAR(255),
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-            phone_number VARCHAR(20),
-            home_address VARCHAR(255),
             token VARCHAR(255)
         );
         `,
@@ -188,7 +184,7 @@ notifyServer.get('/users/:userId/estates', async (req, res) => {
     const isNotified = req.query.isNotified === 'true';
     const analysisCompleted = req.query.analysisCompleted === 'true';
 
-    const threatAnalysisServer = "http://comparative-analysis.voyage-app-02/users/" + userId + "/estates";
+    const threatAnalysisServer = "http://service-comparative-analysis.voyage-app-02" + userId + "/estates";
 
     try {
         const params = {};
