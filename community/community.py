@@ -53,7 +53,7 @@ def hello():
 def users_main():
     conn = get_db_connection()
     if conn is None:
-        return jsonify({"code": 1}), 500
+        return jsonify({"code": "1"}), 500
 
     cur = conn.cursor()
     if request.method == "GET":
@@ -61,7 +61,7 @@ def users_main():
         rows = cur.fetchall()
         data = []
         for r in rows:
-            data.append({"userID": r[0], "username": r[1]})
+            data.append({"userID": str(r[0]), "username": str(r[1])})
         cur.close()
         conn.close()
         return jsonify(data), 200
@@ -71,9 +71,9 @@ def users_main():
         try:
             cur.execute(f"INSERT INTO users_community (username) VALUES ({data['username']});")
             conn.commit()
-            return jsonify({"code": 0}), 200
+            return jsonify({"code": "0"}), 200
         except Exception as e:
-            return jsonify({"code": 1}), 500
+            return jsonify({"code": "1"}), 500
         finally:
             cur.close()
             conn.close()
@@ -82,7 +82,7 @@ def users_main():
 def posts_main():
     conn = get_db_connection()
     if conn is None:
-        return jsonify({"code": 1}), 500
+        return jsonify({"code": "1"}), 500
 
     cur = conn.cursor()
     if request.method == "GET":
@@ -90,7 +90,7 @@ def posts_main():
         rows = cur.fetchall()
         data = []
         for r in rows:
-            data.append({"postID": r[0], "userID": r[1], "postTitle": r[2], "postContent": r[3]})
+            data.append({"postID": str(r[0]), "userID": str(r[1]), "postTitle": str(r[2]), "postContent": str(r[3])})
         cur.close()
         conn.close()
         return jsonify(data), 200
@@ -100,9 +100,9 @@ def posts_main():
         try:
             cur.execute(f"INSERT INTO posts (user_id, title, content) VALUES ({data['userID']}, {data['postTitle']}, {data['postContent']});")
             conn.commit()
-            return jsonify({"code": 0}), 200
+            return jsonify({"code": "0"}), 200
         except Exception as e:
-            return jsonify({"code": 1}), 500
+            return jsonify({"code": "1"}), 500
         finally:
             cur.close()
             conn.close()
@@ -111,7 +111,7 @@ def posts_main():
 def comments_main():
     conn = get_db_connection()
     if conn is None:
-        return jsonify({"code": 1}), 500
+        return jsonify({"code": "1"}), 500
         
     cur = conn.cursor()
     if request.method == "GET":
@@ -119,7 +119,7 @@ def comments_main():
         rows = cur.fetchall()
         data = []
         for r in rows:
-            data.append({"commentID": r[0], "userID": r[1], "postID": r[2], "commentContent": r[3]})
+            data.append({"commentID": str(r[0]), "userID": str(r[1]), "postID": str(r[2]), "commentContent": str(r[3])})
         cur.close()
         conn.close()
         return jsonify(data), 200
@@ -129,9 +129,9 @@ def comments_main():
         try:
             cur.execute(f"INSERT INTO comments (user_id, post_id, content) VALUES ({data['userID']}, {data['postID']}, {data['commentContent']});")
             conn.commit()
-            return jsonify({"code": 0}), 200
+            return jsonify({"code": "0"}), 200
         except Exception as e:
-            return jsonify({"code": 1}), 500
+            return jsonify({"code": "1"}), 500
         finally:
             cur.close()
             conn.close()
@@ -140,35 +140,35 @@ def comments_main():
 def get_user(userID):
     conn = get_db_connection()
     if conn is None:
-        return jsonify({"code": 1}), 500
+        return jsonify({"code": "1"}), 500
         
     cur = conn.cursor()
     if request.method == "GET":
         cur.execute(f"SELECT id, username FROM users_community WHERE id = {userID}")
         row = cur.fetchone()
         if row is None:
-            return jsonify({"code": 1}), 404
+            return jsonify({"code": "1"}), 404
         cur.close()
         conn.close()
-        return jsonify({"userID": row[0], "username": row[1]}), 200
+        return jsonify({"userID": str(row[0]), "username": str(row[1])}), 200
 
 @app.route("/posts/<int:postID>", methods=["GET"])
 def get_post(postID):
     conn = get_db_connection()
     if conn is None:
-        return jsonify({"code": 1}), 500
+        return jsonify({"code": "1"}), 500
 
     cur = conn.cursor()
     if request.method == "GET":
         cur.execute(f"SELECT id, user_id, title, content FROM posts WHERE id = {postID}")
         row = cur.fetchone()
         if row is None:
-            return jsonify({"code": 1}), 404
-        data = {"postID": row[0], "userID": row[1], "postTitle": row[2], "postContent": row[3], "comments": []}
+            return jsonify({"code": "1"}), 404
+        data = {"postID": str(row[0]), "userID": str(row[1]), "postTitle": str(row[2]), "postContent": str(row[3]), "comments": []}
         cur.execute(f"SELECT id, user_id, content FROM comments WHERE post_id = {postID}")
         rows = cur.fetchall()
         for r in rows:
-            data["comments"].append({"commentID": r[0], "userID": r[1], "commentContent": r[2]})
+            data["comments"].append({"commentID": str(r[0]), "userID": str(r[1]), "commentContent": str(r[2])})
         cur.close()
         conn.close()
         return jsonify(data), 200
@@ -177,15 +177,15 @@ def get_post(postID):
 def get_comment(commentID):
     conn = get_db_connection()
     if conn is None:
-        return jsonify({"code": 1}), 500
+        return jsonify({"code": "1"}), 500
 
     cur = conn.cursor()
     if request.method == "GET":
         cur.execute(f"SELECT id, user_id, post_id, content FROM comments WHERE id = {commentID}")
         row = cur.fetchone()
         if row is None:
-            return jsonify({"code": 1}), 404
-        data = {"commentID": row[0], "userID": row[1], "postID": row[2], "commentContent": row[3]}
+            return jsonify({"code": "1"}), 404
+        data = {"commentID": str(row[0]), "userID": str(row[1]), "postID": str(row[2]), "commentContent": str(row[3])}
         cur.close()
         conn.close()
         return jsonify(data), 200
@@ -194,19 +194,19 @@ def get_comment(commentID):
 def handle_user_post(userID, postID):
     conn = get_db_connection()
     if conn is None:
-        return jsonify({"code": 1}), 500
+        return jsonify({"code": "1"}), 500
 
     cur = conn.cursor()
     if request.method == "GET":
         cur.execute(f"SELECT id, user_id, title, content FROM posts WHERE id = {postID} AND user_id = {userID}")
         row = cur.fetchone()
         if row is None:
-            return jsonify({"code": 1}), 404
-        data = {"postID": row[0], "userID": row[1], "postTitle": row[2], "postContent": row[3], "comments": []}
+            return jsonify({"code": "1"}), 404
+        data = {"postID": str(row[0]), "userID": str(row[1]), "postTitle": str(row[2]), "postContent": str(row[3]), "comments": []}
         cur.execute(f"SELECT id, user_id, content FROM comments WHERE post_id = {postID}")
         rows = cur.fetchall()
         for r in rows:
-            data["comments"].append({"commentID": r[0], "userID": r[1], "commentContent": r[2]})
+            data["comments"].append({"commentID": str(r[0]), "userID": str(r[1]), "commentContent": str(r[2])})
         cur.close()
         conn.close()
         return jsonify(data), 200
@@ -216,9 +216,9 @@ def handle_user_post(userID, postID):
         try:
             cur.execute(f"UPDATE posts SET title = {data['postTitle']}, content = {data['postContent']} WHERE id = {postID} AND user_id = {userID}")
             conn.commit()
-            return jsonify({"code": 0}), 200
+            return jsonify({"code": "0"}), 200
         except Exception as e:
-            return jsonify({"code": 1}), 500
+            return jsonify({"code": "1"}), 500
         finally:
             cur.close()
             conn.close()
@@ -228,9 +228,9 @@ def handle_user_post(userID, postID):
             cur.execute(f"DELETE FROM posts WHERE id = {postID} AND user_id = {userID}")
             cur.execute(f"DELETE FROM comments where post_id = {postID}")
             conn.commit()
-            return jsonify({"code": 0}), 200
+            return jsonify({"code": "0"}), 200
         except Exception as e:
-            return jsonify({"code": 1}), 500
+            return jsonify({"code": "1"}), 500
         finally:
             cur.close()
             conn.close()
@@ -239,24 +239,24 @@ def handle_user_post(userID, postID):
 def handle_user_comment(userID, commentID):
     conn = get_db_connection()
     if conn is None:
-        return jsonify({"code": 1}), 500
+        return jsonify({"code": "1"}), 500
 
     cur = conn.cursor()
     if request.method == "GET":
         cur.execute(f"SELECT id, user_id, post_id, content FROM comments WHERE id = {commentID} AND user_id = {userID}")
         row = cur.fetchone()
         if row is None:
-            return jsonify({"code": 1}), 404
-        return jsonify({"commentID": row[0], "userID": row[1], "postID": row[2], "commentContent": row[3]}), 200
+            return jsonify({"code": "1"}), 404
+        return jsonify({"commentID": str(row[0]), "userID": str(row[1]), "postID": str(row[2]), "commentContent": str(row[3])}), 200
 
     elif request.method == "POST":
         data = request.json
         try:
             cur.execute(f"UPDATE comments SET content = {data['commentContent']} WHERE id = {commentID} AND user_id = {userID}")
             conn.commit()
-            return jsonify({"code": 0}), 200
+            return jsonify({"code": "0"}), 200
         except Exception as e:
-            return jsonify({"code": 1}), 500
+            return jsonify({"code": "1"}), 500
         finally:
             cur.close()
             conn.close()
@@ -265,9 +265,9 @@ def handle_user_comment(userID, commentID):
         try:
             cur.execute(f"DELETE FROM comments where comment_id = {commentID}")
             conn.commit()
-            return jsonify({"code": 0}), 200
+            return jsonify({"code": "0"}), 200
         except Exception as e:
-            return jsonify({"code": 1}), 500
+            return jsonify({"code": "1"}), 500
         finally:
             cur.close()
             conn.close()
