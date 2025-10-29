@@ -99,12 +99,11 @@ def posts_main():
         conn.close()
         return jsonify(data), 200
     
-    # {"userID":"109930773329408493076","postTitle":"test","postContent":"tetris"}
     elif request.method == "POST":
         data = request.json
         try:
             # 이미 올바름 - 파라미터화된 쿼리 사용
-            cur.execute("SELECT id FROM users_community WHERE google_id = %s", data['userID'])
+            cur.execute("SELECT id FROM users_community WHERE google_id = %s", (data['userID'],))
             local_user_id = cur.fetchone()
             if local_user_id is None:
                 return jsonify({"code": "1"}), 404
