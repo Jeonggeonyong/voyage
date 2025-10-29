@@ -219,10 +219,8 @@ estatesCompareServer.get('/users/:userId/ai/alarm', async (req, res) => {
         // [유지] 프롬프트 앞부분을 [알림] 형식으로 구성
         if (threatNames.length > 0) {
             const threatString = threatNames.join(', ');
-            // [수정] "이 매물에서" -> "가장 최근 분석에서"
             promptPrefix = `[알림] 가장 최근 분석에서 탐지된 주요 위험은 ${threatString}입니다. 이 내용에 대해 알림 형식으로 사용자에게 답변해주세요. `;
         } else {
-            // [수정] "이 매물에서" -> "가장 최근 분석에서"
             promptPrefix = `[알림] 가장 최근 분석에서 특별히 탐지된 위험은 없습니다. 이 내용에 대해 알림 형식으로 사용자에게 답변해주세요. `;
         }
         
@@ -237,7 +235,7 @@ estatesCompareServer.get('/users/:userId/ai/alarm', async (req, res) => {
         });
 
         // [유지] Gemini 응답은 .response.text() 함수를 호출
-        const aiResponseText = response.response.text();
+        const aiResponseText = response.text();
 
         res.status(200).json(aiResponseText);
         console.log(aiResponseText);
