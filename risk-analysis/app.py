@@ -155,7 +155,7 @@ def takeFileAndInitiateProccess(userID):
     building_money = ""
     ################3 endpoint 이외 전달받은 사항 얻기(파일 제외)
     building_addr = request.form.get("roadAddr")
-    building_zipno = request.form.get("zipNO")
+    building_zipno = request.form.get("zipNo")
     building_name = request.form.get("bdNm")
 
     building_owner = request.form.get("ownerName")
@@ -165,7 +165,7 @@ def takeFileAndInitiateProccess(userID):
 
     app.logger.warning(f"UID >>> {userID}")
     app.logger.warning(f"Addr >>> {building_addr}")
-    app.logger.warning(f"ZipNo >>>{building_zipno}")
+    app.logger.warning(f"ZipNo >>> {building_zipno}")
     app.logger.warning(f"Bname >>> {building_name}")
     #아래의 데이터들은 입력이 없을 시 'noData' 형식을 가짐
     app.logger.warning(f"Owner >>> {building_owner}")
