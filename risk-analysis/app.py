@@ -228,7 +228,7 @@ def body(input_file, input_uid, input_did):
     
     conn.close()
     app.logger.warning("conn object close end")
-    # request_to_checklist_server(u4uid, u4eid)
+    request_to_checklist_server(u4uid, u4eid)
 
     app.logger.warning("back end watch, process one cycle end")
     return True
