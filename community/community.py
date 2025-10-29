@@ -103,16 +103,16 @@ def posts_main():
         data = request.json
         try:
             # 수정: 파라미터 바인딩 수정 (튜플로 전달)
-            cur.execute("SELECT id FROM users_community WHERE google_id = %s", (data['userID'],))
-            local_user_id = cur.fetchone()
-            if local_user_id is None:
-                return jsonify({"code": "1"}), 404
+            cur.execute("SELECT id, username, url FROM users_community WHERE google_id = %s", (data['userID'],))
+            row = cur.fetchone()
+            if row is None:
+                return jsonify({"code": "1", "message": "User not found"}), 404
+            local_user_id, username, url = row
 
-            local_user_id = local_user_id[0]
             cur.execute("INSERT INTO posts (user_id, title, content) VALUES (%s, %s, %s)", 
                        (local_user_id, data['postTitle'], data['postContent']))
             conn.commit()
-            return jsonify({"code": "0"}), 200
+            return jsonify({"username": username, "image_url": url}), 200
         except Exception as e:
             return jsonify({"code": "1", "error": str(e)}), 500
         finally:
@@ -140,18 +140,17 @@ def comments_main():
         data = request.json
         try:
             # 수정: google_id로 users_community.id 조회 후 사용
-            cur.execute("SELECT id FROM users_community WHERE google_id = %s", (data['userID'],))
-            local_user_id = cur.fetchone()
-            if local_user_id is None:
+            cur.execute("SELECT id, username, url FROM users_community WHERE google_id = %s", (data['userID'],))
+            row = cur.fetchone()
+            if row is None:
                 return jsonify({"code": "1", "message": "User not found"}), 404
-            
-            local_user_id = local_user_id[0]
+            local_user_id, username, url = row
             
             # 수정: 내부 user_id 사용
             cur.execute("INSERT INTO comments (user_id, post_id, content) VALUES (%s, %s, %s)", 
                        (local_user_id, data['postID'], data['commentContent']))
             conn.commit()
-            return jsonify({"code": "0"}), 200
+            return jsonify({"username": username, "image_url": url}), 200
         except Exception as e:
             return jsonify({"code": "1", "error": str(e)}), 500
         finally:
