@@ -149,7 +149,7 @@ def get_pdf2(userID):
 
 def request_to_checklist_server(uID, eID):
     app.logger.warning("start send request to checklist_server")
-    dest_url = "http://service-checklist.voyage-app-02:3000"
+    dest_url = "http://service-checklist.voyage-app-02"
     dest_api = f"/users/{uID}/{eID}/checklists/init"    
     
     request_url = dest_url + dest_api
