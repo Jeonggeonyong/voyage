@@ -3,6 +3,17 @@ const estatesCompareServer = express() // 추후에 위험 분석 서버 내부�
 const axios = require('axios')
 const cors = require('cors')
 const { query } = require('./db.js') // DB 쿼리 실행 함수 가져옴
+// 환경변수 모듈 
+require('dotenv').config();
+// 제미나이 모듈
+const { GoogleGenAI } = require("@google/genai");
+
+// .env 파일에서 API 키
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+    console.error("오류: GEMINI_API_KEY가 .env 파일에 설정되지 않았습니다.");
+    process.exit(1); // 서버 시작 중단
+}
 
 estatesCompareServer.use(cors()) // 모든 요청 받을 예정 -> 이후 수정 예정
 estatesCompareServer.use(express.json()); // 
@@ -100,6 +111,16 @@ estatesCompareServer.get('/', (req, res) => {
 });
 
 
+// 제미나이 연결
+estatesCompareServer.get('/ai/ask', async (req, res) => {
+    const prompt = req.query.prompt
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+    });
+    res.status(200).json(response.text)
+    console.log(response.text);
+})
 
 // 주소 검색 API -> 추후 라우터로 분리 예정
 const confmKey = "devU01TX0FVVEgyMDI1MDkyNTEwMTgzOTExNjI2NDU="
