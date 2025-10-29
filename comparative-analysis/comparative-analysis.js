@@ -164,7 +164,7 @@ estatesCompareServer.get('/users/:userId/ai/ask', async (req, res) => {
 estatesCompareServer.get('/users/:userId/ai/alarm', async (req, res) => {
     try {
         const { userId } = req.params; 
-        const { prompt: userPrompt } = req.query;
+        const userPrompt = req.query.prompt;
 
         if (!userPrompt) {
             return res.status(400).json({ error: "prompt 쿼리 파라미터가 필요합니다." });
@@ -233,12 +233,8 @@ estatesCompareServer.get('/users/:userId/ai/alarm', async (req, res) => {
             model: "gemini-2.5-flash",
             contents: finalPrompt,
         });
-
-        // [유지] Gemini 응답은 .response.text() 함수를 호출
-        const aiResponseText = response.text();
-
-        res.status(200).json(aiResponseText);
-        console.log(aiResponseText);
+        res.status(200).json(response.text);
+        console.log(response.text);
 
     } catch (error) {
         console.error("Error in /ai/alarm route:", error);
