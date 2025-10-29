@@ -112,26 +112,52 @@ estatesCompareServer.get('/', (req, res) => {
 
 // 제미나이 연결
 const ai = new GoogleGenAI(GEMINI_API_KEY);
-estatesCompareServer.get('/ai/ask', async (req, res) => {
+estatesCompareServer.get('users/:userId/ai/ask', async (req, res) => {
     try {
-        const prompt = req.query.prompt;
-        if (!prompt) {
-            return res.status(400).json({
-                "message": "prompt 쿼리 파라미터가 필요합니다."
-            });
-        }
+        const { userId } = req.params; 
+        const userPrompt = req.query.prompt;
 
+        const threatQuery = {
+            text: `
+                SELECT DISTINCT t.threat_name 
+                FROM threats t
+                JOIN user_checklists uc ON t.threat_id = uc.threat_id
+                WHERE uc.user_id = $1
+            `,
+            values: [userId],
+        };
+
+        const dbResponse = await db.query(threatQuery);
+        
+        const threatNames = dbResponse.rows.map(row => row.threat_name);
+
+        let promptPrefix = "";
+        
+        if (threatNames.length > 0) {
+            // 유저가 가진 위험이 있다면, 쉼표(,)로 구분된 문자열로 만듭니다.
+            const threatString = threatNames.join(', ');
+            promptPrefix = `사용자가 가진 체크리스트 위험은 ${threatString}입니다. `;
+        }
+        
+        // [수정] 최종 프롬프트 = (위험 정보) + (사용자 질문)
+        const finalPrompt = promptPrefix + userPrompt;
+
+        // (디버깅용) 최종 프롬프트 확인
+        console.log("Final Prompt to AI:", finalPrompt);
+
+        // 7. AI 모델 호출
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: prompt,
+            contents: finalPrompt, // [수정] 기존 prompt 대신 finalPrompt 사용
         });
+
         res.status(200).json(response.text);
         console.log(response.text);
+
     } catch (error) {
-        console.error("AI 모델 호출 중 오류 발생:", error);
-        res.status(500).json({
-            "message": "AI 모델을 호출하는 과정에서 서버 내부 오류가 발생한 경우"
-        });
+        // [수정] 에러 핸들링
+        console.error("Error in /ai/ask route:", error);
+        res.status(500).json({ error: "AI 요청 중 오류가 발생했습니다." });
     }
 });
 // 주소 검색 API -> 추후 라우터로 분리 예정
