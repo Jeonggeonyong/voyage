@@ -249,6 +249,7 @@ checkListServer.get('/', (req, res) => {
 
 // 체크리스트 초기화 API(위험분석 서버에서 요청함)
 checkListServer.post('/users/:userId/:estateId/checklists/init', async (req, res) => {
+    console.log('Request received. Params:', req.params);
     const { userId, estateId } = req.params;
 
     if (!userId || !estateId) {
@@ -257,7 +258,9 @@ checkListServer.post('/users/:userId/:estateId/checklists/init', async (req, res
 
     const client = await pool.connect();
     try {
+        console.log("Attempting pool.connect()..."); // <--- 2. DB 연결 시도
         await client.query('BEGIN');
+        console.log("Pool connected."); // <--- 3. DB 연결 성공
         // 삽입을 시작하기 전, 이전에 존재하던 모든 데이터를 삭제합니다. -> 동일 API로 여러번 호출되면 생길 수 있는 문제 방지
         await client.query(
             'DELETE FROM user_checklists WHERE user_id = $1 AND estate_id = $2',
