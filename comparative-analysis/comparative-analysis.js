@@ -112,7 +112,7 @@ estatesCompareServer.get('/', (req, res) => {
 
 // 제미나이 연결
 const ai = new GoogleGenAI(GEMINI_API_KEY);
-estatesCompareServer.get('users/:userId/ai/ask', async (req, res) => {
+estatesCompareServer.get('/users/:userId/ai/ask', async (req, res) => {
     try {
         const { userId } = req.params; 
         const userPrompt = req.query.prompt;
