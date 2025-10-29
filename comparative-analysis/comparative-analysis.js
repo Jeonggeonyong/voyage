@@ -110,7 +110,7 @@ estatesCompareServer.get('/', (req, res) => {
     res.send('Hello from Express! (comparative-analysis server v1)');
 });
 
-// 제미나이 연결
+// 제미나이 연결_챗봇 형식
 const ai = new GoogleGenAI(GEMINI_API_KEY);
 estatesCompareServer.get('/users/:userId/ai/ask', async (req, res) => {
     try {
@@ -157,6 +157,94 @@ estatesCompareServer.get('/users/:userId/ai/ask', async (req, res) => {
         // [수정] 에러 핸들링
         console.error("Error in /ai/ask route:", error);
         res.status(500).json({ error: "AI 요청 중 오류가 발생했습니다." });
+    }
+});
+
+// 제미나이 알림 형식
+estatesCompareServer.get('/users/:userId/ai/alarm', async (req, res) => {
+    try {
+        const { userId } = req.params; 
+        const { prompt: userPrompt } = req.query;
+
+        if (!userPrompt) {
+            return res.status(400).json({ error: "prompt 쿼리 파라미터가 필요합니다." });
+        }
+
+        // [수정] analysis 테이블에서 해당 'userId'의 '가장 최근' threat_id를 추출하는 쿼리
+        const threatQueryText = `
+            WITH latest_analysis AS (
+                -- 1. 이 유저의 '가장 최근' 분석 1건을 가져옵니다.
+                SELECT title_section_analysis, part_a_analysis, part_b_analysis
+                FROM analysis
+                WHERE user_id = $1 -- [수정] estate_id 조건 제거
+                ORDER BY created_at DESC
+                LIMIT 1
+            ),
+            all_threat_objects AS (
+                -- 2. 3개의 JSONB 컬럼이 null일 경우 빈 배열('[]')로 처리하고, 모든 객체를 하나로 합칩니다.
+                SELECT jsonb_array_elements(COALESCE(title_section_analysis, '[]'::jsonb)) AS threat_obj FROM latest_analysis
+                UNION ALL
+                SELECT jsonb_array_elements(COALESCE(part_a_analysis, '[]'::jsonb)) AS threat_obj FROM latest_analysis
+                UNION ALL
+                SELECT jsonb_array_elements(COALESCE(part_b_analysis, '[]'::jsonb)) AS threat_obj FROM latest_analysis
+            ),
+            distinct_threat_ids AS (
+                -- 3. 합쳐진 객체에서 'threat_id' 키의 값을 정수(INT)로 추출하고 중복을 제거합니다.
+                SELECT DISTINCT (threat_obj->>'threat_id')::INT AS id
+                FROM all_threat_objects
+                WHERE threat_obj->>'threat_id' IS NOT NULL
+            )
+            -- 4. 추출된 ID를 이용해 threats 테이블에서 실제 위험 이름을 조회합니다.
+            SELECT t.threat_name
+            FROM threats t
+            JOIN distinct_threat_ids dti ON t.threat_id = dti.id;
+        `;
+        
+        // [수정] 쿼리 값은 [userId]만 사용
+        const threatQueryValues = [userId];
+        
+        // 3. DB 쿼리 실행
+        const dbResponse = await query(threatQueryText, threatQueryValues);
+
+        // [수정] dbResponse가 비어있을 경우 (해당 유저의 분석이 아예 없는 경우)
+        if (dbResponse.rows.length === 0) {
+            console.log(`No analysis found for userId: ${userId}`);
+            // 분석이 없으므로 위험도 없음
+        }
+        
+        const threatNames = dbResponse.rows.map(row => row.threat_name);
+
+        let promptPrefix = "";
+        
+        // [유지] 프롬프트 앞부분을 [알림] 형식으로 구성
+        if (threatNames.length > 0) {
+            const threatString = threatNames.join(', ');
+            // [수정] "이 매물에서" -> "가장 최근 분석에서"
+            promptPrefix = `[알림] 가장 최근 분석에서 탐지된 주요 위험은 ${threatString}입니다. 이 내용에 대해 알림 형식으로 사용자에게 답변해주세요. `;
+        } else {
+            // [수정] "이 매물에서" -> "가장 최근 분석에서"
+            promptPrefix = `[알림] 가장 최근 분석에서 특별히 탐지된 위험은 없습니다. 이 내용에 대해 알림 형식으로 사용자에게 답변해주세요. `;
+        }
+        
+        const finalPrompt = promptPrefix + userPrompt;
+
+        console.log("Final Prompt to AI (Alarm):", finalPrompt);
+
+        // 4. AI 모델 호출
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: finalPrompt,
+        });
+
+        // [유지] Gemini 응답은 .response.text() 함수를 호출
+        const aiResponseText = response.response.text();
+
+        res.status(200).json(aiResponseText);
+        console.log(aiResponseText);
+
+    } catch (error) {
+        console.error("Error in /ai/alarm route:", error);
+        res.status(500).json({ error: "AI 알림 요청 중 오류가 발생했습니다." });
     }
 });
 
