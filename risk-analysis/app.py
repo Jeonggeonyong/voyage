@@ -4,11 +4,14 @@ import psycopg2
 from dotenv import load_dotenv
 import os
 import uuid
+#up is packages
 
+#down is user idenfied .py files to analysis fucntions
 from risk_anal_analysis import risk_analysis_extract
 from risk_anal_get_text import risk_anal_get_text
 from risk_anal_text_merge import risk_anal_dataFrameParsing 
-from risk_anal_sql_insert import risk_anal_sql_insert
+
+#down is user identified .py files to SQL control
 import risk_anal_sql_t_analysis as sql_anaysis
 import risk_anal_sql_t_estates as sql_estate
 import risk_anal_sql_t_user as sql_user
@@ -90,8 +93,10 @@ def get_db_connection():
 
 
 app = Flask(__name__)
-# with app.app_context():
-#     init_db()
+with app.app_context():
+    app.logger.info("before db init")
+    init_db()
+    app.logger.info("after db init")
 
 USER_ID = ""
 DOC_ID = ""
@@ -116,99 +121,48 @@ OtherRight ="not_found"
 #   -F "document_id=contract_2025_10_28"
 #와 같은 형태일 떄
 #pdf파일과 동시에 유저아이디, 문서아이디를 받는 호출 api
-# @app.route("/request_analysis/<userID>/<locationData>", methods=["POST"])
-# def get_pdf(userID, docID):
-    
-#     f = request.files.get("file")
-#     if not f:
-#         return jsonify({"error": "file 필드가 필요합니다."}), 400
-
-#     # user_id = request.form.get("uid")
-#     # document_id = request.form.get("did")
-#     int_estateID = int_estateID + 1
-#     int_analysisID = int_analysisID + 1
-
-
-#     docID = int_estateID
-#     body(f, userID, docID)
-    # return jsonify({"message" : "we got file, "})
 
 @app.route("/request_analysis/<userID>", methods=["POST"])
 def get_pdf2(userID):
-    
+    app.logger.info("before take pdf file")
     f = request.files.get("file")
     if not f:
         return jsonify({"error": "file 필드가 필요합니다."}), 400
-
+    app.logger.info("pdf file take end")
     # user_id = request.form.get("uid")
     # document_id = request.form.get("did")
-    # int_estateID = int_estateID + 1
-    # int_analysisID = int_analysisID + 1
     uid = userID
     docID = 1
-
     docID = int_estateID
+    app.logger.info("body funciton start")
     body(f, uid, docID)
-    return jsonify({"message" : "proccess complete"})
+    booltype = app.logger.info("body function end")
+    if(booltype == True):
+        return  jsonify({"message" : "proccess complete"}), 200
+    else:
+        return jsonify({"message" : "proccess error by not return True"}), 500
+    
 
 
 def request_to_checklist_server(uID, eID):
-
+    app.logger.info("start send request to checklist_server")
     dest_url = "http://service-checklist.voyage-app-02"
     dest_api = f"/users/{uID}/{eID}/checklists/init"    
 
     request_url = dest_url + dest_api
+    app.logger.info(f"POST TRY BY URL >>>> {request_url}")
     try:
         requests.post(request_url)  # 본문 없이 URL만 POST
         print(f"POST sent to {request_url}")
+        app.logger.info("POST COMPLETE")
     except requests.exceptions.RequestException as e:
-        print(f"Error sending POST: {e}")
-
-# 모든 유저 목록	/users	시스템에 등록된 모든 유저 목록
-# 특정 유저	/users/{userID}	{userID}에 해당하는 특정 유저
-# 모든 매물 목록	/estates	모든 매물 목록
-# 특정 매물	/estates/{estateID}	{estateID}에 해당하는 특정 매물
-# 특정 유저의 위험 분석 완료 매물	/users/{userID}/estates?isAnalysis=true	특정 유저의 위험 분석 완료 매물 목록
-# 두 위험분석 완료 매물의 비교 데이터	/users/{userID}/comparison	특정 유저가 조회한 두 매물의 비교 데이터
-
-
-######### 실행순서
-# 1. 서버 실행 전 initDB를 하고 서버가 listen할 수 있도록, 해당 테이블 없다면 생성해주는 코드를 추가
-# 2. 위험 분석 이후, ESTATES, ANALYSIS, INTERACTIONS 테이블에 INSERT한다.
-
-# 이 때, ANALYSIS 테이블의
-
-# - `title_section_analysis` (`JSONB`)
-# - `part_a_analysis` (`JSONB`)
-# - `part_b_analysis` (`JSONB`)
-
-# 각각의 요소에 `threat_id`  INSERT.
-
-# 이 `threat_id`는 THREATS 테이블에 명시되어 있기도 하고, 그냥 JSONB 형식에 넣을 때 ,
-
-# 따로 저장해놓은 표를 보고 넣어도 됨.
-
-# <표>
-
-# 1. INSERT를 완료한 시점에 checklist 서버 URL : POST `/users/:userId/:estateId/checklists/init` 로 요청
-
-# 1. 요청 받았다면 params(userId, estateId)로 ANALYSIS 테이블을 조회해서 세 부분에 포함된  `threat_id` 를 조회하고, CHECKLISTS 테이블에 이 `threat_id` 로 `checklist_id`를 쿼리를 보냄
-# 2. 이 정보로 USER_CHECKLISTS 테이블에 
-
-# `category` : `analysis` 로 INSERT.
-
-# 1. 이어서 
-
-# `'before_contract','contract_day','after_contract','after_expiration'` 나머지 값들도 INSERT.
-
-# 1. 클라이언트는 체크리스트를 원할 때 GET `/users/:userId/:estateId/checklist` 로 요청을 보내면,  값을 반환받는 것은 동일
-
-#인터렉션
-#분석 끝났으면 자동생성해서, 
+        app.logger.info(f"start send request to checklist_server\n ERROR sending POST {e}")
+        # print(f"Error sending POST: {e}")
+    app.logger.info("end send request to checklist_server")
 
 # @app.route("/activate")
 def body(input_file, input_uid, input_did):
-
+    app.logger.info("start body")
     #동작순서
     # 입력받음
     # 받은 데이터로 처리
@@ -222,11 +176,16 @@ def body(input_file, input_uid, input_did):
     doc_id_test = "docid_dummy"
     #이거 지역정보에 대해서 처리 추가 필요(함수 인자를 추가하든, 튜플을 복사할때 끼워 넣든 등)
     #해결시 해당 문구 제거할 것
+    app.logger.info("before get text")
     building_location_info, scaned_text_df_dict = risk_anal_get_text(input_file, id_test, doc_id_test)
+
+    app.logger.info("before parsing")
     merged_text_df_dict = risk_anal_dataFrameParsing(scaned_text_df_dict)
+    
+    app.logger.info("before extract")
     extracted_tutple = risk_analysis_extract(merged_text_df_dict, building_location_info)
 
-    #uuid 생성
+    #uuid 생성 
     u4uid = uuid.uuid4()
     u4eid = uuid.uuid4()
     u4aid = uuid.uuid4()
@@ -239,33 +198,39 @@ def body(input_file, input_uid, input_did):
     print("u4eid >>> ", u4eid)
     print("u4aid >>> ", u4aid)
     ##uuid생성 
-
+    #uid는 기존 uuid였다 바뀐것(TEXT)
     u4uid = str(input_uid)
 
     ##########
+    app.logger.info("conn object gen start")
     conn = get_db_connection()
-
-    #### 가라코드 유저정보 테이블
+    app.logger.info("conn object gen end")
+    #### 가라코드 유저정보 테이블 필요없음 => 사전에 반드시 입력되어있어야함
     # sql_user.sql_insert_to_analysis(conn, u4uid)
-###########
+    ###########
     ##### estate 삽입
     eid = int_estateID #d이거는 수정해야해 uuid 패키지 사용하는걸로 일단 이거는 테스트용 가라코드
+    app.logger.info("before insert esates")
     sql_estate.sql_insert_to_estates(conn, u4eid,"경기도 용인시 수지구 죽전동 123외 79필지 단국대 죽전캠퍼스 소프트웨어  아이씨티관, 미디어센터" , "경기도 용인시 수지구 죽전동 123외 79필지 단국대 죽전캠퍼스 소프트웨어  아이씨티관, 미디어센터", "16890")
+    app.logger.info("after insert estates")
     ##### analysis 삽입 
     analid = int_analysisID
+    app.logger.info("before insert analysis")
     sql_anaysis.sql_insert_to_analysis(conn, u4aid, u4eid, u4uid, 50)
+    app.logger.info("after insert analysis")
     ######### interaction 삽입
+    app.logger.info("before insert interaction")
     sql_interactions.sql_insert_to_interaction(conn, u4uid, u4eid, "analysisCompleted")
+    app.logger.info("after insert interaction")
     #
-    print("after insert")
+    
     
     conn.close()
-
+    app.logger.info("conn object close end")
     # request_to_checklist_server(u4uid, u4eid)
 
-    risk_anal_sql_insert(id_test, doc_id_test, extracted_tutple)
-    print("back end watch, process one cycle end")
-    return "Flask Install success"
+    app.logger.info("back end watch, process one cycle end")
+    return True
 
 
 
@@ -363,7 +328,7 @@ def eatate_compare_target_user(usrID):
 
 @app.route("/status/info")
 def status():
-    return "status info"
+    return jsonify({"message" : "proccess running"}), 200
 
 if __name__ == "__main__":
     app.run(host = "0.0.0.0", port= 3000)
