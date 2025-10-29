@@ -94,9 +94,9 @@ def get_db_connection():
 
 app = Flask(__name__)
 with app.app_context():
-    app.logger.info("before db init")
+    app.logger.warning("before db init")
     init_db()
-    app.logger.info("after db init")
+    app.logger.warning("after db init")
 
 USER_ID = ""
 DOC_ID = ""
@@ -124,19 +124,20 @@ OtherRight ="not_found"
 
 @app.route("/request_analysis/<userID>", methods=["POST"])
 def get_pdf2(userID):
-    app.logger.info("before take pdf file")
+    app.logger.warning("before take pdf file")
     f = request.files.get("file")
     if not f:
         return jsonify({"error": "file 필드가 필요합니다."}), 400
-    app.logger.info("pdf file take end")
+    app.logger.warning("pdf file take end")
     # user_id = request.form.get("uid")
     # document_id = request.form.get("did")
     uid = userID
     docID = 1
     docID = int_estateID
-    app.logger.info("body funciton start")
-    body(f, uid, docID)
-    booltype = app.logger.info("body function end")
+    app.logger.warning("body funciton start")
+    booltype = body(f, uid, docID)
+    app.logger.warning("body function end")
+    print("body return type >>> ", booltype)
     if(booltype == True):
         return  jsonify({"message" : "proccess complete"}), 200
     else:
@@ -145,24 +146,24 @@ def get_pdf2(userID):
 
 
 def request_to_checklist_server(uID, eID):
-    app.logger.info("start send request to checklist_server")
+    app.logger.warning("start send request to checklist_server")
     dest_url = "http://service-checklist.voyage-app-02"
     dest_api = f"/users/{uID}/{eID}/checklists/init"    
 
     request_url = dest_url + dest_api
-    app.logger.info(f"POST TRY BY URL >>>> {request_url}")
+    app.logger.warning(f"POST TRY BY URL >>>> {request_url}")
     try:
         requests.post(request_url)  # 본문 없이 URL만 POST
         print(f"POST sent to {request_url}")
-        app.logger.info("POST COMPLETE")
+        app.logger.warning("POST COMPLETE")
     except requests.exceptions.RequestException as e:
-        app.logger.info(f"start send request to checklist_server\n ERROR sending POST {e}")
+        app.logger.warning(f"start send request to checklist_server\n ERROR sending POST {e}")
         # print(f"Error sending POST: {e}")
-    app.logger.info("end send request to checklist_server")
+    app.logger.warning("end send request to checklist_server")
 
 # @app.route("/activate")
 def body(input_file, input_uid, input_did):
-    app.logger.info("start body")
+    app.logger.warning("start body")
     #동작순서
     # 입력받음
     # 받은 데이터로 처리
@@ -176,13 +177,13 @@ def body(input_file, input_uid, input_did):
     doc_id_test = "docid_dummy"
     #이거 지역정보에 대해서 처리 추가 필요(함수 인자를 추가하든, 튜플을 복사할때 끼워 넣든 등)
     #해결시 해당 문구 제거할 것
-    app.logger.info("before get text")
+    app.logger.warning("before get text")
     building_location_info, scaned_text_df_dict = risk_anal_get_text(input_file, id_test, doc_id_test)
 
-    app.logger.info("before parsing")
+    app.logger.warning("before parsing")
     merged_text_df_dict = risk_anal_dataFrameParsing(scaned_text_df_dict)
     
-    app.logger.info("before extract")
+    app.logger.warning("before extract")
     extracted_tutple = risk_analysis_extract(merged_text_df_dict, building_location_info)
 
     #uuid 생성 
@@ -202,34 +203,34 @@ def body(input_file, input_uid, input_did):
     u4uid = str(input_uid)
 
     ##########
-    app.logger.info("conn object gen start")
+    app.logger.warning("conn object gen start")
     conn = get_db_connection()
-    app.logger.info("conn object gen end")
+    app.logger.warning("conn object gen end")
     #### 가라코드 유저정보 테이블 필요없음 => 사전에 반드시 입력되어있어야함
     # sql_user.sql_insert_to_analysis(conn, u4uid)
     ###########
     ##### estate 삽입
     eid = int_estateID #d이거는 수정해야해 uuid 패키지 사용하는걸로 일단 이거는 테스트용 가라코드
-    app.logger.info("before insert esates")
+    app.logger.warning("before insert esates")
     sql_estate.sql_insert_to_estates(conn, u4eid,"경기도 용인시 수지구 죽전동 123외 79필지 단국대 죽전캠퍼스 소프트웨어  아이씨티관, 미디어센터" , "경기도 용인시 수지구 죽전동 123외 79필지 단국대 죽전캠퍼스 소프트웨어  아이씨티관, 미디어센터", "16890")
-    app.logger.info("after insert estates")
+    app.logger.warning("after insert estates")
     ##### analysis 삽입 
     analid = int_analysisID
-    app.logger.info("before insert analysis")
+    app.logger.warning("before insert analysis")
     sql_anaysis.sql_insert_to_analysis(conn, u4aid, u4eid, u4uid, 50)
-    app.logger.info("after insert analysis")
+    app.logger.warning("after insert analysis")
     ######### interaction 삽입
-    app.logger.info("before insert interaction")
+    app.logger.warning("before insert interaction")
     sql_interactions.sql_insert_to_interaction(conn, u4uid, u4eid, "analysisCompleted")
-    app.logger.info("after insert interaction")
+    app.logger.warning("after insert interaction")
     #
     
     
     conn.close()
-    app.logger.info("conn object close end")
+    app.logger.warning("conn object close end")
     # request_to_checklist_server(u4uid, u4eid)
 
-    app.logger.info("back end watch, process one cycle end")
+    app.logger.warning("back end watch, process one cycle end")
     return True
 
 
