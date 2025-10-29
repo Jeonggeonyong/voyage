@@ -42,7 +42,7 @@ async function initializeDatabase() {
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
         `,
-        // 3. interactions 테이블 (users_analysis, estates 참조)
+        // 3. interactions 테이블 (users_analysis, estates 참조 )
         `
         CREATE TABLE IF NOT EXISTS interactions (
             interaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
