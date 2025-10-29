@@ -149,16 +149,17 @@ def get_pdf2(userID):
 
 def request_to_checklist_server(uID, eID):
     app.logger.warning("start send request to checklist_server")
-    dest_url = "http://service-checklist.voyage-app-02"
+    dest_url = "http://service-checklist.voyage-app-02:3000"
     dest_api = f"/users/{uID}/{eID}/checklists/init"    
     
     request_url = dest_url + dest_api
     app.logger.warning(f"POST TRY BY URL >>>> {request_url}")
     try:
-        response = requests.post(request_url)  
-        app.logger.warning("status code", response.status_code)
-        app.logger.warning("response text", response.text)
-        return str(response.status_code) + +"___" + str(response.text)
+        requests.post(request_url)
+        # response = requests.post(request_url)  
+        # app.logger.warning("status code", response.status_code)
+        # app.logger.warning("response text", response.text)
+        # return str(response.status_code)  +"___" + str(response.text)
         print(f"POST sent to {request_url}")
         app.logger.warning("POST COMPLETE")
     except requests.exceptions.RequestException as e:
