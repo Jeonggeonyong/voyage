@@ -18,7 +18,7 @@ async function initializeDatabase() {
     // 1. users_analysis 테이블 (의존성 없음)
     `
     CREATE TABLE IF NOT EXISTS users_analysis (
-            user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id TEXT PRIMARY KEY,
             user_name VARCHAR(50),
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
             token VARCHAR(255)
@@ -27,7 +27,7 @@ async function initializeDatabase() {
     // 2. estates 테이블 (의존성 없음)
     `
     CREATE TABLE IF NOT EXISTS estates (
-        estate_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        estate_id UUID PRIMARY KEY,
         estate_name VARCHAR(255),
         estate_address VARCHAR(255),
         zip_no VARCHAR(10),
@@ -55,11 +55,11 @@ async function initializeDatabase() {
     // 5. analysis 테이블 (estates 참조)
     `
     CREATE TABLE IF NOT EXISTS analysis (
-        analysis_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        analysis_id UUID PRIMARY KEY,
     -- estates 테이블 참조 (FK)
         estate_id UUID REFERENCES estates(estate_id) ON DELETE CASCADE,
     -- [추가25/10/28] users_analysis 테이블 참조 (FK)
-        user_id UUID REFERENCES users_analysis(user_id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users_analysis(user_id) ON DELETE CASCADE,
         risk_score INT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         title_section_analysis JSONB,
@@ -74,7 +74,7 @@ async function initializeDatabase() {
         -- checklists (static) 테이블 참조 (FK)
         checklist_id INT REFERENCES checklists(checklist_id) ON DELETE CASCADE,      
         -- users_analysis 테이블 참조 (FK)
-        user_id UUID REFERENCES users_analysis(user_id) ON DELETE CASCADE,    
+        user_id TEXT REFERENCES users_analysis(user_id) ON DELETE CASCADE,    
         -- estates 테이블 참조 (FK)
         estate_id UUID REFERENCES estates(estate_id) ON DELETE CASCADE,  
         -- threats 테이블 참조 (FK)

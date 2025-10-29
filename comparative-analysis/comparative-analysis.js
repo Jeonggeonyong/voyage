@@ -18,7 +18,7 @@ async function initializeDatabase() {
         // 1. users_analysis 테이블
         `
         CREATE TABLE IF NOT EXISTS users_analysis (
-            user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id TEXT PRIMARY KEY,
             user_name VARCHAR(50),
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
             token VARCHAR(255)
@@ -27,7 +27,7 @@ async function initializeDatabase() {
         // 2. ESTATES 테이블
         `
         CREATE TABLE IF NOT EXISTS estates (
-            estate_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            estate_id UUID PRIMARY KEY,
             estate_name VARCHAR(255),
             estate_address VARCHAR(255),
             zip_no VARCHAR(10),
@@ -47,9 +47,9 @@ async function initializeDatabase() {
         // 4. ANALYSIS 테이블
         `
         CREATE TABLE IF NOT EXISTS analysis (
-            analysis_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            analysis_id UUID PRIMARY KEY,
             estate_id UUID REFERENCES estates(estate_id) ON DELETE CASCADE,
-            user_id UUID REFERENCES users_analysis(user_id) ON DELETE CASCADE,
+            user_id TEXT REFERENCES users_analysis(user_id) ON DELETE CASCADE,
             risk_score INT,
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
             title_section_analysis JSONB,
@@ -61,7 +61,7 @@ async function initializeDatabase() {
         `
         CREATE TABLE IF NOT EXISTS interactions (
             interaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID REFERENCES users_analysis(user_id) ON DELETE CASCADE,
+            user_id TEXT REFERENCES users_analysis(user_id) ON DELETE CASCADE,
             estate_id UUID REFERENCES estates(estate_id) ON DELETE CASCADE,
             
             interaction_type VARCHAR(50) NOT NULL CHECK (interaction_type IN ('isNotified', 'analysisCompleted', 'interested', 'contractCompleted')),
