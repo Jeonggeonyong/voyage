@@ -134,7 +134,8 @@ estatesCompareServer.get('/estates/search', async (req, res) => {
     const filteredAddressData = addressData.map(estate => {
         return {
             roadAddr: estate.roadAddr,
-            zipNo: estate.zipNo
+            zipNo: estate.zipNo,
+            bdNm : estate.bdNm
         };
     });
 
