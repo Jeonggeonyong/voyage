@@ -8,7 +8,10 @@ load_dotenv()
 def init_db():
     t1 = """CREATE TABLE IF NOT EXISTS users_community (
         id SERIAL PRIMARY KEY,
-        username VARCHAR(50) UNIQUE NOT NULL
+        google_id TEXT NOT NULL,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        image_url TEXT NOT NULL
+
     );"""
     t2 = """CREATE TABLE IF NOT EXISTS posts (
         id SERIAL PRIMARY KEY,
@@ -57,11 +60,11 @@ def users_main():
 
     cur = conn.cursor()
     if request.method == "GET":
-        cur.execute("SELECT id, username FROM users_community")
+        cur.execute("SELECT id, username, image_url FROM users_community")
         rows = cur.fetchall()
         data = []
         for r in rows:
-            data.append({"userID": str(r[0]), "username": str(r[1])})
+            data.append({"userID": str(r[0]), "username": str(r[1]), "image_url": str(r[2])})
         cur.close()
         conn.close()
         return jsonify(data), 200
@@ -70,7 +73,7 @@ def users_main():
         data = request.json
         try:
             # 수정: 파라미터화된 쿼리 사용
-            cur.execute("INSERT INTO users_community (username) VALUES (%s)", (data['username'],))
+            cur.execute("INSERT INTO users_community (google_id, username, image_url) VALUES (%s, %s, %s)", (data['google_id'], data['username'], data['image_url']))
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
