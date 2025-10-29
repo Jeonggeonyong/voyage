@@ -110,8 +110,8 @@ estatesCompareServer.get('/', (req, res) => {
     res.send('Hello from Express! (comparative-analysis server v1)');
 });
 
-//const userContext = "템플릿 : [답변]/n/n 으로 시 3줄씩 2문단으로 적어줘."
 // 제미나이 연결
+const ai = new GoogleGenAI({GEMINI_API_KEY});
 estatesCompareServer.get('/ai/ask', async (req, res) => {
     try {
         const prompt = req.query.prompt;
@@ -123,7 +123,6 @@ estatesCompareServer.get('/ai/ask', async (req, res) => {
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
-            systemInstruction: userContext,
             contents: prompt,
         });
         res.status(200).json(response.text);
