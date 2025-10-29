@@ -1,18 +1,17 @@
 require('dotenv').config();
 const express = require('express');
+const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
-const proxy = require('express-http-proxy'); // 👈 프록시 라이브러리 import
-const { query } = require('./db'); // DB 쿼리 함수
+const { query } = require('./db');
 
 const app = express();
-// express-http-proxy는 자체적으로 body를 스트리밍하므로 express.json()이 필요 없을 수 있습니다.
-// 만약 다른 미들웨어가 JSON body를 필요로 한다면 남겨두세요.
-// app.use(express.json());
+// JSON 요청 처리를 위해 유지합니다. 파일 업로드는 아래에서 다르게 처리합니다.
+app.use(express.json());
 
 // --- CORS 설정 ---
 const corsOptions = {
-    origin: 'http://localhost:5500', // 로컬 테스트 환경 주소
+    origin: 'http://localhost:5500',
     optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
@@ -20,100 +19,122 @@ app.use(cors(corsOptions));
 
 // [설정] 라우팅할 서비스 목록 (FQDN 사용 필수!)
 const services = {
-    '/oauth2': 'http://service-oauth2.voyage-app-02.svc.cluster.local',
-    '/alarm': 'http://service-alarm.voyage-app-02.svc.cluster.local',
-    '/risk-analysis': 'http://service-risk-analysis.voyage-app-02.svc.cluster.local',
-    '/community': 'http://service-community.voyage-app-02.svc.cluster.local',
-    '/comparative-analysis': 'http://service-comparative-analysis.voyage-app-02.svc.cluster.local', // 실제 서비스 이름 확인
-    '/checklist': 'http://service-checklist.voyage-app-02.svc.cluster.local' // 실제 서비스 이름 확인
+    '/oauth2': { target: 'http://service-oauth2.voyage-app-02.svc.cluster.local' },
+    '/alarm': { target: 'http://service-alarm.voyage-app-02.svc.cluster.local' },
+    '/risk-analysis': { target: 'http://service-risk-analysis.voyage-app-02.svc.cluster.local' },
+    '/community': { target: 'http://service-community.voyage-app-02.svc.cluster.local' },
+    '/comparative-analysis': { target: 'http://service-comparative-analysis.voyage-app-02.svc.cluster.local' },
+    '/checklist': { target: 'http://service-checklist.voyage-app-02.svc.cluster.local' }
 };
 
 // [설정] JWT 인증이 필요 없는 공개 경로 목록
 const publicRoutes = ['/oauth2'];
 
-// --- 인증 미들웨어 (DB 조회 포함) ---
+// --- 인증 미들웨어 (이전과 동일) ---
 const authenticateJWT = async (req, res, next) => {
+    // ... (인증 로직 변경 없음) ...
     const isPublic = publicRoutes.some(route => req.path.startsWith(route));
     if (isPublic) {
-        return next(); // 공개 경로면 통과
+        return next();
     }
-
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
-        return res.status(401).json({ message: 'Unauthorized. Token required.' });
+        return res.status(401).json({ message: 'Unauthorized.' });
     }
-
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        console.log('JWT 검증 성공 (payload):', decoded); // decoded.id는 Google ID
-
-        // Google ID로 DB에서 사용자 PK 조회
         const { rows } = await query('SELECT id FROM users WHERE google_id = $1', [decoded.id]);
-
         if (rows.length === 0) {
-            console.warn(`Authentication Error: User (google_id) ${decoded.id} not found in DB.`);
             return res.status(401).json({ message: 'Unauthorized. User not found.' });
         }
-
-        // req 객체에 DB 사용자 ID 저장 (나중에 프록시 헤더에 추가하기 위해)
-        req.dbUserId = rows[0].id;
-        req.userEmail = decoded.email; // 이메일도 저장
+        req.headers['x-user-id'] = rows[0].id; // DB PK 전달
+        req.headers['x-user-email'] = decoded.email;
         next();
     } catch (error) {
-        console.error('JWT Verification Error:', error.message);
-        return res.status(403).json({ message: 'Forbidden. Invalid token.' });
+        return res.status(403).json({ message: 'Forbidden.' });
     }
 };
+app.use(authenticateJWT);
 // --- 인증 미들웨어 끝 ---
 
-// 모든 요청에 대해 인증 미들웨어를 먼저 거치도록 설정
-app.use(authenticateJWT);
+// --- 프록시 요청 처리 ---
+app.use('/', (req, res) => { // async 제거 (스트림 파이핑을 위해)
+    for (const prefix in services) {
+        if (req.path.startsWith(prefix)) {
+            const { target } = services[prefix];
+            const targetUrl = new URL(target);
 
-// --- 프록시 라우팅 설정 ---
-for (const prefix in services) {
-    const target = services[prefix];
+            // [수정] Prefix 제거 로직 (필요하다면 유지, 필요 없다면 req.originalUrl 사용)
+            const backendPath = req.originalUrl.substring(prefix.length) || '/';
+            const url = `${targetUrl.origin}${backendPath}`;
 
-    app.use(prefix, proxy(target, {
-        // 옵션: 프록시 요청 보내기 전 옵션 설정
-        proxyReqOptDecorator: function(proxyReqOpts, srcReq) {
-            // 인증 미들웨어에서 저장한 사용자 정보를 헤더에 추가
-            if (srcReq.dbUserId) {
-                proxyReqOpts.headers['x-user-id'] = srcReq.dbUserId;
-            }
-            if (srcReq.userEmail) {
-                proxyReqOpts.headers['x-user-email'] = srcReq.userEmail;
-            }
-            // 원래 호스트 헤더 대신 타겟 서비스의 호스트 사용 (K8s 환경에서 중요할 수 있음)
-            proxyReqOpts.headers['host'] = new URL(target).hostname;
+            console.log(`Forwarding request for '${req.originalUrl}' to ${url}`);
 
-            console.log(`Proxying ${srcReq.method} ${srcReq.originalUrl} to ${target}`);
-            return proxyReqOpts;
-        },
-        // 옵션: 프록시 요청 경로 설정 (원본 경로 그대로 전달)
-        proxyReqPathResolver: function (req) {
-            const originalPath = req.originalUrl;
-            console.log(`Resolving path: ${originalPath}`);
-            return originalPath;
-        },
-        // 옵션: 백엔드 서비스 에러 처리
-        userResDecorator: function(proxyRes, proxyResData, userReq, userRes) {
-            if (proxyRes.statusCode >= 400) {
-                 console.error(`Error response from backend service (${proxyRes.statusCode}):`, proxyResData.toString('utf8'));
-                 // 클라이언트에게 에러 메시지를 좀 더 친절하게 전달할 수도 있음
-                 // return JSON.stringify({ message: "Backend service error." });
-            }
-            return proxyResData; // 성공 시 데이터 그대로 반환
+            // [ 여기가 핵심 수정 ]
+            // axios 대신 req 스트림을 직접 파이핑합니다.
+            req.pipe(axios({
+                method: req.method,
+                url: url,
+                // data: req.body, // 제거: req.body 대신 스트림 사용
+                headers: {
+                    // 원본 헤더 전달 (Content-Type 포함 중요!)
+                    ...req.headers,
+                    // 인증 미들웨어에서 추가한 헤더 포함
+                    'x-user-id': req.headers['x-user-id'],
+                    'x-user-email': req.headers['x-user-email'],
+                    // 호스트 헤더는 백엔드 서비스 것으로 교체
+                    'host': targetUrl.hostname
+                },
+                responseType: 'stream',
+                // 파일 업로드를 위해 제한 해제 (선택 사항이지만 안전)
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity
+            }).then(response => {
+                // 백엔드 응답 헤더 설정
+                res.status(response.status);
+                // 중요 헤더만 선별적으로 전달하거나, 필요에 따라 모두 전달
+                // 주의: 모든 헤더 전달 시 보안 문제 발생 가능성 있음 (예: set-cookie)
+                 Object.keys(response.headers).forEach(key => {
+                    // 예시: 특정 헤더만 전달
+                    if (['content-type', 'content-length'].includes(key.toLowerCase())) {
+                       res.setHeader(key, response.headers[key]);
+                    }
+                 });
+                // 백엔드 응답 스트림을 클라이언트로 파이핑
+                response.data.pipe(res);
+            }).catch(error => {
+                // 에러 처리 로직 (이전과 유사)
+                console.error('--- Axios Error during Pipe ---');
+                if (error.response) {
+                    console.error('Status:', error.response.status);
+                    console.error('Headers:', error.response.headers);
+                    // 에러 응답 스트림 처리 (선택 사항)
+                    let errorData = '';
+                    error.response.data.on('data', chunk => errorData += chunk);
+                    error.response.data.on('end', () => {
+                         console.error('Data:', errorData);
+                         const statusCode = error.response.status || 502;
+                         res.status(statusCode).json({ message: 'Error forwarding to service (backend error).' });
+                    });
+                } else if (error.request) {
+                    console.error('Request Error:', error.request);
+                    res.status(502).json({ message: 'Error forwarding to service (no response).' });
+                } else {
+                    console.error('Error Message:', error.message);
+                    res.status(500).json({ message: 'Error forwarding to service (setup error).' });
+                }
+            }));
+            // [ 핵심 수정 끝 ]
+
+            return; // 요청 처리 완료
         }
-    }));
-}
-// --- 프록시 라우팅 끝 ---
-
-// 매칭되는 서비스 경로가 없을 경우 404 처리
-app.use((req, res) => {
+    }
+    // 매칭되는 서비스 경로가 없을 경우 404
     res.status(404).json({ message: 'Not Found. No matching service route.' });
 });
+// --- 프록시 요청 처리 끝 ---
 
 const PORT = 3000;
-app.listen(PORT, '0.0.0.0', () => { // 👈 컨테이너 외부 접근을 위해 '0.0.0.0' 추가
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`API Gateway server running on port ${PORT}`);
 });
