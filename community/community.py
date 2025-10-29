@@ -11,7 +11,6 @@ def init_db():
         google_id TEXT NOT NULL,
         username VARCHAR(255) UNIQUE NOT NULL,
         image_url TEXT NOT NULL
-
     );"""
     t2 = """CREATE TABLE IF NOT EXISTS posts (
         id SERIAL PRIMARY KEY,
@@ -72,8 +71,8 @@ def users_main():
     elif request.method == "POST":
         data = request.json
         try:
-            # 수정: 파라미터화된 쿼리 사용
-            cur.execute("INSERT INTO users_community (google_id, username, image_url) VALUES (%s, %s, %s)", (data['google_id'], data['username'], data['image_url']))
+            cur.execute("INSERT INTO users_community (google_id, username, image_url) VALUES (%s, %s, %s)", 
+                       (data['google_id'], data['username'], data['image_url']))
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
@@ -99,21 +98,23 @@ def posts_main():
         conn.close()
         return jsonify(data), 200
     
+    # {"userID":"109930773329408493076","postTitle":"test","postContent":"tetris"}
     elif request.method == "POST":
         data = request.json
         try:
-            # 이미 올바름 - 파라미터화된 쿼리 사용
+            # 수정: 파라미터 바인딩 수정 (튜플로 전달)
             cur.execute("SELECT id FROM users_community WHERE google_id = %s", (data['userID'],))
             local_user_id = cur.fetchone()
             if local_user_id is None:
                 return jsonify({"code": "1"}), 404
 
-            local_user_id = str(local_user_id[0])
-            cur.execute("INSERT INTO posts (user_id, title, content) VALUES (%s, %s, %s)", (local_user_id, data['postTitle'], data['postContent']))
+            local_user_id = local_user_id[0]
+            cur.execute("INSERT INTO posts (user_id, title, content) VALUES (%s, %s, %s)", 
+                       (local_user_id, data['postTitle'], data['postContent']))
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
-            return jsonify({"code": "1"}), 500
+            return jsonify({"code": "1", "error": str(e)}), 500
         finally:
             cur.close()
             conn.close()
@@ -138,12 +139,21 @@ def comments_main():
     elif request.method == "POST":
         data = request.json
         try:
-            # 수정: 파라미터화된 쿼리 사용
-            cur.execute("INSERT INTO comments (user_id, post_id, content) VALUES (%s, %s, %s)", (data['userID'], data['postID'], data['commentContent']))
+            # 수정: google_id로 users_community.id 조회 후 사용
+            cur.execute("SELECT id FROM users_community WHERE google_id = %s", (data['userID'],))
+            local_user_id = cur.fetchone()
+            if local_user_id is None:
+                return jsonify({"code": "1", "message": "User not found"}), 404
+            
+            local_user_id = local_user_id[0]
+            
+            # 수정: 내부 user_id 사용
+            cur.execute("INSERT INTO comments (user_id, post_id, content) VALUES (%s, %s, %s)", 
+                       (local_user_id, data['postID'], data['commentContent']))
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
-            return jsonify({"code": "1"}), 500
+            return jsonify({"code": "1", "error": str(e)}), 500
         finally:
             cur.close()
             conn.close()
@@ -156,7 +166,8 @@ def get_user(userID):
         
     cur = conn.cursor()
     if request.method == "GET":
-        cur.execute(f"SELECT id, username FROM users_community WHERE id = {userID}")
+        # 수정: 파라미터화된 쿼리 사용
+        cur.execute("SELECT id, username FROM users_community WHERE id = %s", (userID,))
         row = cur.fetchone()
         if row is None:
             return jsonify({"code": "1"}), 404
@@ -172,12 +183,13 @@ def get_post(postID):
 
     cur = conn.cursor()
     if request.method == "GET":
-        cur.execute(f"SELECT id, user_id, title, content FROM posts WHERE id = {postID}")
+        # 수정: 파라미터화된 쿼리 사용
+        cur.execute("SELECT id, user_id, title, content FROM posts WHERE id = %s", (postID,))
         row = cur.fetchone()
         if row is None:
             return jsonify({"code": "1"}), 404
         data = {"postID": str(row[0]), "userID": str(row[1]), "postTitle": str(row[2]), "postContent": str(row[3]), "comments": []}
-        cur.execute(f"SELECT id, user_id, content FROM comments WHERE post_id = {postID}")
+        cur.execute("SELECT id, user_id, content FROM comments WHERE post_id = %s", (postID,))
         rows = cur.fetchall()
         for r in rows:
             data["comments"].append({"commentID": str(r[0]), "userID": str(r[1]), "commentContent": str(r[2])})
@@ -193,7 +205,8 @@ def get_comment(commentID):
 
     cur = conn.cursor()
     if request.method == "GET":
-        cur.execute(f"SELECT id, user_id, post_id, content FROM comments WHERE id = {commentID}")
+        # 수정: 파라미터화된 쿼리 사용
+        cur.execute("SELECT id, user_id, post_id, content FROM comments WHERE id = %s", (commentID,))
         row = cur.fetchone()
         if row is None:
             return jsonify({"code": "1"}), 404
@@ -202,20 +215,27 @@ def get_comment(commentID):
         conn.close()
         return jsonify(data), 200
         
-@app.route("/users/<int:userID>/posts/<int:postID>", methods=["GET", "POST", "DELETE"])
-def handle_user_post(userID, postID):
+@app.route("/users/<userID>/posts/<int:postID>", methods=["GET", "POST", "DELETE"])
+def handle_user_post(userID, postID):  # 수정: userID를 문자열로 받음
     conn = get_db_connection()
     if conn is None:
         return jsonify({"code": "1"}), 500
 
     cur = conn.cursor()
     if request.method == "GET":
-        cur.execute(f"SELECT id, user_id, title, content FROM posts WHERE id = {postID} AND user_id = {userID}")
+        # 수정: google_id로 users_community.id 조회 후 사용
+        cur.execute("SELECT id FROM users_community WHERE google_id = %s", (userID,))
+        local_user_id_result = cur.fetchone()
+        if local_user_id_result is None:
+            return jsonify({"code": "1"}), 404
+        local_user_id = local_user_id_result[0]
+        
+        cur.execute("SELECT id, user_id, title, content FROM posts WHERE id = %s AND user_id = %s", (postID, local_user_id))
         row = cur.fetchone()
         if row is None:
             return jsonify({"code": "1"}), 404
         data = {"postID": str(row[0]), "userID": str(row[1]), "postTitle": str(row[2]), "postContent": str(row[3]), "comments": []}
-        cur.execute(f"SELECT id, user_id, content FROM comments WHERE post_id = {postID}")
+        cur.execute("SELECT id, user_id, content FROM comments WHERE post_id = %s", (postID,))
         rows = cur.fetchall()
         for r in rows:
             data["comments"].append({"commentID": str(r[0]), "userID": str(r[1]), "commentContent": str(r[2])})
@@ -226,37 +246,70 @@ def handle_user_post(userID, postID):
     elif request.method == "POST":
         data = request.json
         try:
-            # 수정: 파라미터화된 쿼리 사용
-            cur.execute("UPDATE posts SET title = %s, content = %s WHERE id = %s AND user_id = %s", (data['postTitle'], data['postContent'], postID, userID))
+            # 수정: google_id로 users_community.id 조회 후 사용
+            cur.execute("SELECT id FROM users_community WHERE google_id = %s", (userID,))
+            local_user_id_result = cur.fetchone()
+            if local_user_id_result is None:
+                return jsonify({"code": "1"}), 404
+            local_user_id = local_user_id_result[0]
+            
+            cur.execute("UPDATE posts SET title = %s, content = %s WHERE id = %s AND user_id = %s", 
+                       (data['postTitle'], data['postContent'], postID, local_user_id))
+            if cur.rowcount == 0:
+                conn.rollback()
+                return jsonify({"code": "1", "message": "Post not found or unauthorized"}), 404
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
-            return jsonify({"code": "1"}), 500
+            conn.rollback()
+            return jsonify({"code": "1", "error": str(e)}), 500
         finally:
             cur.close()
             conn.close()
     
     elif request.method == "DELETE":
         try:
-            cur.execute(f"DELETE FROM posts WHERE id = {postID} AND user_id = {userID}")
-            cur.execute(f"DELETE FROM comments where post_id = {postID}")
+            # 수정: google_id로 users_community.id 조회
+            cur.execute("SELECT id FROM users_community WHERE google_id = %s", (userID,))
+            local_user_id_result = cur.fetchone()
+            if local_user_id_result is None:
+                return jsonify({"code": "1", "message": "User not found"}), 404
+            local_user_id = local_user_id_result[0]
+            
+            # 수정: 파라미터화된 쿼리 사용 및 권한 체크
+            cur.execute("DELETE FROM comments WHERE post_id = %s", (postID,))
+            cur.execute("DELETE FROM posts WHERE id = %s AND user_id = %s", (postID, local_user_id))
+            
+            if cur.rowcount == 0:  # 삭제된 행이 없으면 권한 없음
+                conn.rollback()
+                return jsonify({"code": "1", "message": "Post not found or unauthorized"}), 404
+            
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
-            return jsonify({"code": "1"}), 500
+            conn.rollback()
+            return jsonify({"code": "1", "error": str(e)}), 500
         finally:
             cur.close()
             conn.close()
 
-@app.route("/users/<int:userID>/comments/<int:commentID>", methods=["GET", "POST", "DELETE"])
-def handle_user_comment(userID, commentID):
+@app.route("/users/<userID>/comments/<int:commentID>", methods=["GET", "POST", "DELETE"])
+def handle_user_comment(userID, commentID):  # 수정: userID를 문자열로 받음
     conn = get_db_connection()
     if conn is None:
         return jsonify({"code": "1"}), 500
 
     cur = conn.cursor()
     if request.method == "GET":
-        cur.execute(f"SELECT id, user_id, post_id, content FROM comments WHERE id = {commentID} AND user_id = {userID}")
+        # 수정: google_id로 users_community.id 조회 후 사용
+        cur.execute("SELECT id FROM users_community WHERE google_id = %s", (userID,))
+        local_user_id_result = cur.fetchone()
+        if local_user_id_result is None:
+            return jsonify({"code": "1"}), 404
+        local_user_id = local_user_id_result[0]
+        
+        cur.execute("SELECT id, user_id, post_id, content FROM comments WHERE id = %s AND user_id = %s", 
+                   (commentID, local_user_id))
         row = cur.fetchone()
         if row is None:
             return jsonify({"code": "1"}), 404
@@ -265,27 +318,53 @@ def handle_user_comment(userID, commentID):
     elif request.method == "POST":
         data = request.json
         try:
-            # 수정: 파라미터화된 쿼리 사용
-            cur.execute("UPDATE comments SET content = %s WHERE id = %s AND user_id = %s", (data['commentContent'], commentID, userID))
+            # 수정: google_id로 users_community.id 조회 후 사용
+            cur.execute("SELECT id FROM users_community WHERE google_id = %s", (userID,))
+            local_user_id_result = cur.fetchone()
+            if local_user_id_result is None:
+                return jsonify({"code": "1"}), 404
+            local_user_id = local_user_id_result[0]
+            
+            cur.execute("UPDATE comments SET content = %s WHERE id = %s AND user_id = %s", 
+                       (data['commentContent'], commentID, local_user_id))
+            if cur.rowcount == 0:
+                conn.rollback()
+                return jsonify({"code": "1", "message": "Comment not found or unauthorized"}), 404
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
-            return jsonify({"code": "1"}), 500
+            conn.rollback()
+            return jsonify({"code": "1", "error": str(e)}), 500
         finally:
             cur.close()
             conn.close()
     
     elif request.method == "DELETE":
         try:
-            # 수정: 컬럼명 수정 (comment_id → id)
-            cur.execute("DELETE FROM comments WHERE id = %s", (commentID,))
+            # 수정: google_id로 users_community.id 조회
+            cur.execute("SELECT id FROM users_community WHERE google_id = %s", (userID,))
+            local_user_id_result = cur.fetchone()
+            if local_user_id_result is None:
+                return jsonify({"code": "1", "message": "User not found"}), 404
+            local_user_id = local_user_id_result[0]
+            
+            # 수정: 파라미터화된 쿼리 사용 및 권한 체크
+            cur.execute("DELETE FROM comments WHERE id = %s AND user_id = %s", (commentID, local_user_id))
+            
+            if cur.rowcount == 0:  # 삭제된 행이 없으면 권한 없음
+                conn.rollback()
+                return jsonify({"code": "1", "message": "Comment not found or unauthorized"}), 404
+            
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
-            return jsonify({"code": "1"}), 500
+            conn.rollback()
+            return jsonify({"code": "1", "error": str(e)}), 500
         finally:
             cur.close()
             conn.close()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000)
+
+# temporary fix from cursor ai. will revert if anything goes wrong.
