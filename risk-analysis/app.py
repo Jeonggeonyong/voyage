@@ -10,19 +10,19 @@ import uuid
 from risk_anal_analysis import risk_analysis_extract
 from risk_anal_get_text import risk_anal_get_text
 from risk_anal_text_merge import risk_anal_dataFrameParsing 
-
+from risk_anal_threat_classify import threat_classify
 #down is user identified .py files to SQL control
 import risk_anal_sql_t_analysis as sql_anaysis
 import risk_anal_sql_t_estates as sql_estate
 import risk_anal_sql_t_user as sql_user
 import risk_anal_sql_interations as sql_interactions
-
+import risk_anal_sql_estaes_isin as sql_isin_estate
 
 load_dotenv()
- 
+ #아날 아이디 자동생성으로 변경
 def init_db():
     t3 = """CREATE TABLE IF NOT EXISTS public.analysis (
-        analysis_id UUID PRIMARY KEY,
+        analysis_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         estate_id UUID NOT NULL,
         user_id TEXT NOT NULL,
         risk_score INT,
@@ -115,6 +115,10 @@ Additional ="not_found"
 OtherRight ="not_found"
 
 
+
+############ do not addit
+PROJECT_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS, "kpaas-address-namespace")
+
 # curl -X POST http://localhost:5000/api/pdf/upload \
 #   -F "file=@/path/to/sample.pdf" \
 #   -F "user_id=alice_01" \
@@ -122,8 +126,19 @@ OtherRight ="not_found"
 #와 같은 형태일 떄
 #pdf파일과 동시에 유저아이디, 문서아이디를 받는 호출 api
 
+# curl -X POST \
+#   -H "Authorization: Bearer <token>" \
+#   -F "file=@/path/to/check_register.pdf" \
+#   -F "roadAddr=서울특별시 중구 세종대로 110" \
+#   -F "zipNo=04524" \
+#   -F "bdNm=서울시청" \
+#   -F "ownerName=홍길동" \
+#   -F "buildingUse=주거용" \
+#   -F "jeonseDeposit=50000000" \
+#   "http://nginx.210.178.1.110.nip.io/risk-analysis/request_analysis/109930773329408493076"
+
 @app.route("/request_analysis/<userID>", methods=["POST"])
-def get_pdf2(userID):
+def takeFileAndInitiateProccess(userID):
     app.logger.warning("before take pdf file")
     f = request.files.get("file")
     if not f:
@@ -131,27 +146,57 @@ def get_pdf2(userID):
     app.logger.warning("pdf file take end")
     # user_id = request.form.get("uid")
     # document_id = request.form.get("did")
+
+    building_addr = ""
+    building_name =""
+    building_zipno = ""
+    building_perpose = ""
+    building_owner = ""
+    building_money = ""
+    ################3 endpoint 이외 전달받은 사항 얻기(파일 제외)
+    building_addr = request.form.get("roadAddr")
+    building_zipno = request.form.get("zipNO")
+    building_name = request.form.get("bdNm")
+
+    building_owner = request.form.get("ownerName")
+    building_perpose = request.form.get("buildingUse")
+    building_money = request.form.get("jeonseDeposit")
+
+
+    app.logger.warning(f"UID >>> {userID}")
+    app.logger.warning(f"Addr >>> {building_addr}")
+    app.logger.warning(f"ZipNo >>>{building_zipno}")
+    app.logger.warning(f"Bname >>> {building_name}")
+    #아래의 데이터들은 입력이 없을 시 'noData' 형식을 가짐
+    app.logger.warning(f"Owner >>> {building_owner}")
+    app.logger.warning(f"Perpose >>> {building_perpose}")
+    app.logger.warning(f"Money >>> {building_money}")
+
+    ##################
     uid = userID
     docID = 1
     docID = int_estateID
     app.logger.warning("body funciton start")
-    booltype = body(f, uid, docID)
+    booltype = body(f, uid, docID, building_addr, building_zipno, building_name, building_owner, building_perpose, building_money)
     app.logger.warning("body function end")
-    app.logger.warning("body return type >>> ", booltype)
+    # app.logger.warning("body return type >>> ", booltype)
     app.logger.warning("END PROCESS =======================================")
     if(booltype == True):
         return  jsonify({"message" : "proccess complete"}), 200
     else:
         return jsonify({"message" : "proccess error by not return True"}), 500
     
-    
+def deterministic_uuid_by_zipno(input_zipno : str) -> uuid:
+    return uuid.uuid5(PROJECT_NAMESPACE, input_zipno)
+
+
 
 
 def request_to_checklist_server(uID, eID):
     app.logger.warning("start send request to checklist_server")
     dest_url = "http://service-checklist.voyage-app-02"
     dest_api = f"/users/{uID}/{eID}/checklists/init"    
-    
+
     request_url = dest_url + dest_api
     app.logger.warning(f"POST TRY BY URL >>>> {request_url}")
     try:
@@ -167,14 +212,23 @@ def request_to_checklist_server(uID, eID):
         # print(f"Error sending POST: {e}")
     app.logger.warning("end send request to checklist_server")
 
+#################################################################################################################################
+#################################################################################################################################
+#################################################################################################################################
+#################################################################################################################################
 # @app.route("/activate")
-def body(input_file, input_uid, input_did):
+#(파일, 유저아이디, 문서아이디, 주소, 우편번호, 건물명, 목적, 소유주, 돈)
+def body(input_file, input_uid, input_did, input_building_addr, input_building_zipno, input_building_name, input_building_owner, input_building_perpose, input_building_money):
     app.logger.warning("start body")
     #동작순서
     # 입력받음
     # 받은 데이터로 처리
     # 받은데이터로 처리 완료
     # 처리 이후
+
+
+
+
     global USER_ID
     global DOC_ID
     id_test = input_uid
@@ -191,55 +245,112 @@ def body(input_file, input_uid, input_did):
     
     app.logger.warning("before extract")
     extracted_tutple = risk_analysis_extract(merged_text_df_dict, building_location_info)
-
+    app.logger.warning("before parsing extracted tuple")
+    ext_building_addr = extracted_tutple[0][0]
+    app.logger.warning("before threat Classfiy")
+    extracted_list_tuple = threat_classify(extracted_tutple, input_building_addr, input_building_perpose, input_building_owner)
+    app.logger.warning("BEFORE SQL PROCCESS")
+    ##################################################################################################위는 분석 소스
+#############
+#############
+#############
+#############
+    ##################################################################################################아래는 sql관련 처리
+    app.logger.warning("START SQL PROCCESS")
     #uuid 생성 
-    u4uid = uuid.uuid4()
-    u4eid = uuid.uuid4()
-    u4aid = uuid.uuid4()
+    # u4uid = uuid.uuid4()
+    # new_u5euid_str = uuid.uuid4()
+    # u4aid = uuid.uuid4()
 
-    u4uid = str(u4uid)
-    u4eid = str(u4eid)
-    u4aid = str(u4aid)
+    # u4uid = str(u4uid)
+    # new_u5euid_str = str(new_u5euid_str)
+    # u4aid = str(u4aid)
 
     # print("u4uid >>> ", u4uid)
-    print("u4eid >>> ", u4eid)
-    print("u4aid >>> ", u4aid)
+    # print("u4eid >>> ", new_u5euid_str)
+    # print("u4aid >>> ", u4aid)
+
+    ##############
     ##uuid생성 
     #uid는 기존 uuid였다 바뀐것(TEXT)
     u4uid = str(input_uid)
 
-    ##########
+    ###########
     app.logger.warning("conn object gen start")
     conn = get_db_connection()
     app.logger.warning("conn object gen end")
+
+    ############# new estateID by deterministic uuid5
+    app.logger.warning("BEFORE MAKE estates ID")
+    new_u5euid = deterministic_uuid_by_zipno(input_building_zipno)
+    new_u5euid_str = str(new_u5euid)
+    app.logger.warning("BEFORE MAKE estatesID IS exist")
+    is_exist = sql_isin_estate.isin_estateID(conn, new_u5euid_str)
+    if(is_exist == True):
+        #만약 esatesID가 이미 존재한다면
+        #estates에 삽입 불필요
+        app.logger.warning("Now esateID is already exist")
+        
+    elif(is_exist == False):
+        app.logger.warning("Now esateID is new ID")
+        ##### estate 삽입
+        eid = int_estateID #d이거는 수정해야해 uuid 패키지 사용하는걸로 일단 이거는 테스트용 가라코드
+        app.logger.warning("before insert esates")
+        #name, addr 순
+        sql_estate.sql_insert_to_estates(conn, new_u5euid_str,input_building_name, ext_building_addr, input_building_zipno)
+        app.logger.warning("after insert estates")
+    else:
+        app.logger.warning("======sql query has some problem=========")
+
+
+    ##########
     #### 가라코드 유저정보 테이블 필요없음 => 사전에 반드시 입력되어있어야함
     # sql_user.sql_insert_to_analysis(conn, u4uid)
     ###########
-    ##### estate 삽입
-    eid = int_estateID #d이거는 수정해야해 uuid 패키지 사용하는걸로 일단 이거는 테스트용 가라코드
-    app.logger.warning("before insert esates")
-    sql_estate.sql_insert_to_estates(conn, u4eid,"경기도 용인시 수지구 죽전동 123외 79필지 단국대 죽전캠퍼스 소프트웨어  아이씨티관, 미디어센터" , "경기도 용인시 수지구 죽전동 123외 79필지 단국대 죽전캠퍼스 소프트웨어  아이씨티관, 미디어센터", "16890")
-    app.logger.warning("after insert estates")
+
     ##### analysis 삽입 
+    ### 반드시 여기에서 입력받은 모든 값을 사용하여, 위험에 대한 분류를 시행해야 함 
     analid = int_analysisID
     app.logger.warning("before insert analysis")
-    sql_anaysis.sql_insert_to_analysis(conn, u4aid, u4eid, u4uid, 50)
+    sql_anaysis.sql_insert_to_analysis(conn, new_u5euid_str, u4uid, 50, extracted_list_tuple)
     app.logger.warning("after insert analysis")
+
+
+
+
+
     ######### interaction 삽입
     app.logger.warning("before insert interaction")
-    sql_interactions.sql_insert_to_interaction(conn, u4uid, u4eid, "analysisCompleted")
+    sql_interactions.sql_insert_to_interaction(conn, u4uid, new_u5euid_str, "analysisCompleted")
     app.logger.warning("after insert interaction")
     #
     
     
     conn.close()
     app.logger.warning("conn object close end")
-    request_to_checklist_server(u4uid, u4eid)
+
+
+    #체크리스트 서버에 리퀘스트 던지기
+    request_to_checklist_server(u4uid, new_u5euid_str)
 
     app.logger.warning("back end watch, process one cycle end")
     return True
 
 
+
+
+
+
+
+
+
+
+
+
+########################################################################################################################################
+########################################################################################################################################
+########################################################################################################################################
+########################################################################################################################################
 
 @app.route("/users")
 def user_all():

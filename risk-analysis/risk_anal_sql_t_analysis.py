@@ -19,22 +19,23 @@
 import psycopg2
 import json
 
-def sql_insert_to_analysis(conn, analID, esID, uID, risk_score):
+def sql_insert_to_analysis(conn, esID, uID, risk_score, list_tuple : tuple):
     #psycopg2.connect.cursor()
     #cur => conn.cursor()
-    print(analID, esID, uID, risk_score)
-    insert_query = "INSERT INTO public.analysis (analysis_id, estate_id, user_id, risk_score, title_section_analysis, part_a_analysis, part_b_analysis) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+    #analID is automatically generated
+    print(esID, uID, risk_score)
+    insert_query = "INSERT INTO public.analysis (estate_id, user_id, risk_score, title_section_analysis, part_a_analysis, part_b_analysis) VALUES (%s, %s, %s, %s, %s, %s)"
 
-    array_title = [3]
-    array_a = []
-    array_b = []
+    array_title = list_tuple[0]
+    array_a = list_tuple[1]
+    array_b = list_tuple[2]
 
     t = json.dumps(array_title)
     a= json.dumps(array_a)
     b=json.dumps(array_b)
 
     cur = conn.cursor()
-    cur.execute(insert_query, (analID, esID, uID, risk_score, t, a, b))
+    cur.execute(insert_query, (esID, uID, risk_score, t, a, b))
     
 
 
