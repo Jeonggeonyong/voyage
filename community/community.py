@@ -8,7 +8,7 @@ load_dotenv()
 def init_db():
     t1 = """CREATE TABLE IF NOT EXISTS users_community (
         id SERIAL PRIMARY KEY,
-        google_id TEXT NOT NULL,
+        google_id TEXT NOT NULL UNIQUE,
         username VARCHAR(255) UNIQUE NOT NULL,
         image_url TEXT NOT NULL
 
@@ -103,7 +103,13 @@ def posts_main():
         data = request.json
         try:
             # 이미 올바름 - 파라미터화된 쿼리 사용
-            cur.execute("INSERT INTO posts (user_id, title, content) VALUES (%s, %s, %s)", (data['userID'], data['postTitle'], data['postContent']))
+            cur.execute("SELECT user_id FROM users_community WHERE google_id = %s", data['userID'])
+            local_user_id = cur.fetchone()
+            if local_user_id is None:
+                return jsonify({"code": "1"}), 404
+
+            local_user_id = str(local_user_id[0])
+            cur.execute("INSERT INTO posts (user_id, title, content) VALUES (%s, %s, %s)", (local_user_id, data['postTitle'], data['postContent']))
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
