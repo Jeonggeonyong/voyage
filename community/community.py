@@ -98,7 +98,7 @@ def posts_main():
     elif request.method == "POST":
         data = request.json
         try:
-            cur.execute(f"INSERT INTO posts (user_id, title, content) VALUES ({data['userID']}, {data['postTitle']}, {data['postContent']});")
+            cur.execute("INSERT INTO posts (user_id, title, content) VALUES (%s, %s, %s)", (data['userID'], data['postTitle'], data['postContent']))
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
