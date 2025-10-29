@@ -110,75 +110,88 @@ estatesCompareServer.get('/', (req, res) => {
     res.send('Hello from Express! (comparative-analysis server v1)');
 });
 
-
+//const userContext = "템플릿 : [답변]/n/n 으로 시 3줄씩 2문단으로 적어줘."
 // 제미나이 연결
 estatesCompareServer.get('/ai/ask', async (req, res) => {
-    const prompt = req.query.prompt
-    const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-    });
-    res.status(200).json(response.text)
-    console.log(response.text);
-})
+    try {
+        const prompt = req.query.prompt;
+        if (!prompt) {
+            return res.status(400).json({
+                "message": "prompt 쿼리 파라미터가 필요합니다."
+            });
+        }
 
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            systemInstruction: userContext,
+            contents: prompt,
+        });
+        res.status(200).json(response.text);
+        console.log(response.text);
+    } catch (error) {
+        console.error("AI 모델 호출 중 오류 발생:", error);
+        res.status(500).json({
+            "message": "AI 모델을 호출하는 과정에서 서버 내부 오류가 발생한 경우"
+        });
+    }
+});
 // 주소 검색 API -> 추후 라우터로 분리 예정
 const confmKey = "devU01TX0FVVEgyMDI1MDkyNTEwMTgzOTExNjI2NDU="
 
 estatesCompareServer.get('/estates/search', async (req, res) => {
-    try{
-    const keyword = req.query.keyword;
-    if (!keyword) {
-        return res.status(400).json({ message: '검색할 키워드를 입력해주세요.' });
-    }
-    const currentPage = 1;
-    const countPerPage = 10;
-    const searchAddressURL = "https://business.juso.go.kr/addrlink/addrLinkApi.do"
-    const params = { // 요청시 쿼리 파라미터를 넘기면 자동으로 ?와 &와 연결해서 할당
-        currentPage: 1,
-        countPerPage: 10,
-        keyword: keyword,
-        confmKey: confmKey,
-        hstryYn: 'Y',
-        firstSort: 'road',
-        resultType: 'json'
-    };
-
-    const apiResponse = await axios.get(searchAddressURL, { // 두번째 인자는 옵션, 여러 옵션이 들어갈 수 있기 때문에 객체 리터럴
-        params: params
-    });
-
-    console.log(apiResponse);
-
-    const totalCount = apiResponse.data.results.common.totalCount;
-    const addressData = apiResponse.data.results.juso || []; 
-    const filteredAddressData = addressData.map(estate => {
-        return {
-            roadAddr: estate.roadAddr,
-            zipNo: estate.zipNo,
-            bdNm : estate.bdNm
+    try {
+        const keyword = req.query.keyword;
+        if (!keyword) {
+            return res.status(400).json({ message: '검색할 키워드를 입력해주세요.' });
+        }
+        const currentPage = 1;
+        const countPerPage = 10;
+        const searchAddressURL = "https://business.juso.go.kr/addrlink/addrLinkApi.do"
+        const params = { // 요청시 쿼리 파라미터를 넘기면 자동으로 ?와 &와 연결해서 할당
+            currentPage: 1,
+            countPerPage: 10,
+            keyword: keyword,
+            confmKey: confmKey,
+            hstryYn: 'Y',
+            firstSort: 'road',
+            resultType: 'json'
         };
-    });
 
-    console.log("검색 결과 매물 수 : " + totalCount);
-    console.log(filteredAddressData);
+        const apiResponse = await axios.get(searchAddressURL, { // 두번째 인자는 옵션, 여러 옵션이 들어갈 수 있기 때문에 객체 리터럴
+            params: params
+        });
 
-    if (filteredAddressData.length === 0) {
-        return res.status(200).json({
-            message: "검색 결과가 없습니다.",
-            data: []
+        console.log(apiResponse);
+
+        const totalCount = apiResponse.data.results.common.totalCount;
+        const addressData = apiResponse.data.results.juso || [];
+        const filteredAddressData = addressData.map(estate => {
+            return {
+                roadAddr: estate.roadAddr,
+                zipNo: estate.zipNo,
+                bdNm: estate.bdNm
+            };
+        });
+
+        console.log("검색 결과 매물 수 : " + totalCount);
+        console.log(filteredAddressData);
+
+        if (filteredAddressData.length === 0) {
+            return res.status(200).json({
+                message: "검색 결과가 없습니다.",
+                data: []
+            });
+        }
+
+        res.status(200).json({
+            message: "주소 검색 결과를 성공적으로 가져왔습니다.",
+            data: filteredAddressData
         });
     }
-
-    res.status(200).json({
-        message: "주소 검색 결과를 성공적으로 가져왔습니다.",
-        data: filteredAddressData
-    });
-}
-catch(err){
-    console.error("주소 API 조회 중 오류 발생:", err.message);
-    res.status(500).json({ message: "주소 검색 중 서버 오류가 발생했습니다." });
-}
+    catch (err) {
+        console.error("주소 API 조회 중 오류 발생:", err.message);
+        res.status(500).json({ message: "주소 검색 중 서버 오류가 발생했습니다." });
+    }
 });
 
 
@@ -295,9 +308,9 @@ estatesCompareServer.get('/users/:userId/comparison', async (req, res) => {
 
         // 💡 수정 7: pool.query, db.query 대신 가져온 query 함수 사용 및 Promise.all로 병렬 처리
         const [result1, result2] = await Promise.all([
-        query(estateAnalysisQuery, [estate1Id, userId]), // userId 추가
-        query(estateAnalysisQuery, [estate2Id, userId])  // userId 추가
-    ]);
+            query(estateAnalysisQuery, [estate1Id, userId]), // userId 추가
+            query(estateAnalysisQuery, [estate2Id, userId])  // userId 추가
+        ]);
 
         // 두 번째 매물(estate2Id)의 최신 데이터 조회
         // 💡 수정: 중복 쿼리 정의 제거 (estateAnalysisQuery로 대체됨)
