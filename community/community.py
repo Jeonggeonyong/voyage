@@ -69,7 +69,8 @@ def users_main():
     elif request.method == "POST":
         data = request.json
         try:
-            cur.execute(f"INSERT INTO users_community (username) VALUES ({data['username']});")
+            # 수정: 파라미터화된 쿼리 사용
+            cur.execute("INSERT INTO users_community (username) VALUES (%s)", (data['username'],))
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
@@ -98,6 +99,7 @@ def posts_main():
     elif request.method == "POST":
         data = request.json
         try:
+            # 이미 올바름 - 파라미터화된 쿼리 사용
             cur.execute("INSERT INTO posts (user_id, title, content) VALUES (%s, %s, %s)", (data['userID'], data['postTitle'], data['postContent']))
             conn.commit()
             return jsonify({"code": "0"}), 200
@@ -127,7 +129,8 @@ def comments_main():
     elif request.method == "POST":
         data = request.json
         try:
-            cur.execute(f"INSERT INTO comments (user_id, post_id, content) VALUES ({data['userID']}, {data['postID']}, {data['commentContent']});")
+            # 수정: 파라미터화된 쿼리 사용
+            cur.execute("INSERT INTO comments (user_id, post_id, content) VALUES (%s, %s, %s)", (data['userID'], data['postID'], data['commentContent']))
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
@@ -214,7 +217,8 @@ def handle_user_post(userID, postID):
     elif request.method == "POST":
         data = request.json
         try:
-            cur.execute(f"UPDATE posts SET title = {data['postTitle']}, content = {data['postContent']} WHERE id = {postID} AND user_id = {userID}")
+            # 수정: 파라미터화된 쿼리 사용
+            cur.execute("UPDATE posts SET title = %s, content = %s WHERE id = %s AND user_id = %s", (data['postTitle'], data['postContent'], postID, userID))
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
@@ -252,7 +256,8 @@ def handle_user_comment(userID, commentID):
     elif request.method == "POST":
         data = request.json
         try:
-            cur.execute(f"UPDATE comments SET content = {data['commentContent']} WHERE id = {commentID} AND user_id = {userID}")
+            # 수정: 파라미터화된 쿼리 사용
+            cur.execute("UPDATE comments SET content = %s WHERE id = %s AND user_id = %s", (data['commentContent'], commentID, userID))
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
@@ -263,7 +268,8 @@ def handle_user_comment(userID, commentID):
     
     elif request.method == "DELETE":
         try:
-            cur.execute(f"DELETE FROM comments where comment_id = {commentID}")
+            # 수정: 컬럼명 수정 (comment_id → id)
+            cur.execute("DELETE FROM comments WHERE id = %s", (commentID,))
             conn.commit()
             return jsonify({"code": "0"}), 200
         except Exception as e:
