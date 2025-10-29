@@ -103,7 +103,7 @@ def posts_main():
         data = request.json
         try:
             # 수정: 파라미터 바인딩 수정 (튜플로 전달)
-            cur.execute("SELECT id, username, url FROM users_community WHERE google_id = %s", (data['userID'],))
+            cur.execute("SELECT id, username, image_url FROM users_community WHERE google_id = %s", (data['userID'],))
             row = cur.fetchone()
             if row is None:
                 return jsonify({"code": "1", "message": "User not found"}), 404
@@ -140,7 +140,7 @@ def comments_main():
         data = request.json
         try:
             # 수정: google_id로 users_community.id 조회 후 사용
-            cur.execute("SELECT id, username, url FROM users_community WHERE google_id = %s", (data['userID'],))
+            cur.execute("SELECT id, username, image_url FROM users_community WHERE google_id = %s", (data['userID'],))
             row = cur.fetchone()
             if row is None:
                 return jsonify({"code": "1", "message": "User not found"}), 404
