@@ -127,8 +127,7 @@ estatesCompareServer.get('users/:userId/ai/ask', async (req, res) => {
             values: [userId],
         };
 
-        const dbResponse = await db.query(threatQuery);
-        
+        const dbResponse = await query(threatQuery.text, threatQuery.values);        
         const threatNames = dbResponse.rows.map(row => row.threat_name);
 
         let promptPrefix = "";
@@ -160,6 +159,7 @@ estatesCompareServer.get('users/:userId/ai/ask', async (req, res) => {
         res.status(500).json({ error: "AI 요청 중 오류가 발생했습니다." });
     }
 });
+
 // 주소 검색 API -> 추후 라우터로 분리 예정
 const confmKey = "devU01TX0FVVEgyMDI1MDkyNTEwMTgzOTExNjI2NDU="
 
