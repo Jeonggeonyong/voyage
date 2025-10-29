@@ -89,11 +89,24 @@ def posts_main():
 
     cur = conn.cursor()
     if request.method == "GET":
-        cur.execute("SELECT id, user_id, title, content FROM posts")
+        # 수정: JOIN하여 작성자 정보 포함
+        cur.execute("""
+            SELECT p.id, p.user_id, p.title, p.content, u.username, u.image_url
+            FROM posts p
+            JOIN users_community u ON u.id = p.user_id
+            ORDER BY p.id DESC
+        """)
         rows = cur.fetchall()
         data = []
         for r in rows:
-            data.append({"postID": str(r[0]), "userID": str(r[1]), "postTitle": str(r[2]), "postContent": str(r[3])})
+            data.append({
+                "postID": str(r[0]), 
+                "userID": str(r[1]), 
+                "postTitle": str(r[2]), 
+                "postContent": str(r[3]),
+                "username": str(r[4]),
+                "image_url": str(r[5])
+            })
         cur.close()
         conn.close()
         return jsonify(data), 200
@@ -103,16 +116,17 @@ def posts_main():
         data = request.json
         try:
             # 수정: 파라미터 바인딩 수정 (튜플로 전달)
-            cur.execute("SELECT id, username, image_url FROM users_community WHERE google_id = %s", (data['userID'],))
+            cur.execute("SELECT id FROM users_community WHERE google_id = %s", (data['userID'],))
             row = cur.fetchone()
             if row is None:
                 return jsonify({"code": "1", "message": "User not found"}), 404
-            local_user_id, username, url = row
+            local_user_id = row[0]
 
             cur.execute("INSERT INTO posts (user_id, title, content) VALUES (%s, %s, %s)", 
                        (local_user_id, data['postTitle'], data['postContent']))
             conn.commit()
-            return jsonify({"username": username, "image_url": url}), 200
+            # 수정: 이미지 URL 반환하지 않음
+            return jsonify({"code": "0"}), 200
         except Exception as e:
             return jsonify({"code": "1", "error": str(e)}), 500
         finally:
@@ -127,11 +141,24 @@ def comments_main():
         
     cur = conn.cursor()
     if request.method == "GET":
-        cur.execute("SELECT id, user_id, post_id, content FROM comments")
+        # 수정: JOIN하여 작성자 정보 포함
+        cur.execute("""
+            SELECT c.id, c.user_id, c.post_id, c.content, u.username, u.image_url
+            FROM comments c
+            JOIN users_community u ON u.id = c.user_id
+            ORDER BY c.id DESC
+        """)
         rows = cur.fetchall()
         data = []
         for r in rows:
-            data.append({"commentID": str(r[0]), "userID": str(r[1]), "postID": str(r[2]), "commentContent": str(r[3])})
+            data.append({
+                "commentID": str(r[0]), 
+                "userID": str(r[1]), 
+                "postID": str(r[2]), 
+                "commentContent": str(r[3]),
+                "username": str(r[4]),
+                "image_url": str(r[5])
+            })
         cur.close()
         conn.close()
         return jsonify(data), 200
@@ -140,17 +167,18 @@ def comments_main():
         data = request.json
         try:
             # 수정: google_id로 users_community.id 조회 후 사용
-            cur.execute("SELECT id, username, image_url FROM users_community WHERE google_id = %s", (data['userID'],))
+            cur.execute("SELECT id FROM users_community WHERE google_id = %s", (data['userID'],))
             row = cur.fetchone()
             if row is None:
                 return jsonify({"code": "1", "message": "User not found"}), 404
-            local_user_id, username, url = row
+            local_user_id = row[0]
             
             # 수정: 내부 user_id 사용
             cur.execute("INSERT INTO comments (user_id, post_id, content) VALUES (%s, %s, %s)", 
                        (local_user_id, data['postID'], data['commentContent']))
             conn.commit()
-            return jsonify({"username": username, "image_url": url}), 200
+            # 수정: 이미지 URL 반환하지 않음
+            return jsonify({"code": "0"}), 200
         except Exception as e:
             return jsonify({"code": "1", "error": str(e)}), 500
         finally:
@@ -182,16 +210,44 @@ def get_post(postID):
 
     cur = conn.cursor()
     if request.method == "GET":
-        # 수정: 파라미터화된 쿼리 사용
-        cur.execute("SELECT id, user_id, title, content FROM posts WHERE id = %s", (postID,))
+        # 수정: 게시글 작성자 정보 포함
+        cur.execute("""
+            SELECT p.id, p.user_id, p.title, p.content, u.username, u.image_url
+            FROM posts p
+            JOIN users_community u ON u.id = p.user_id
+            WHERE p.id = %s
+        """, (postID,))
         row = cur.fetchone()
         if row is None:
             return jsonify({"code": "1"}), 404
-        data = {"postID": str(row[0]), "userID": str(row[1]), "postTitle": str(row[2]), "postContent": str(row[3]), "comments": []}
-        cur.execute("SELECT id, user_id, content FROM comments WHERE post_id = %s", (postID,))
+        
+        data = {
+            "postID": str(row[0]), 
+            "userID": str(row[1]), 
+            "postTitle": str(row[2]), 
+            "postContent": str(row[3]),
+            "username": str(row[4]),
+            "image_url": str(row[5]),
+            "comments": []
+        }
+        
+        # 수정: 댓글 작성자 정보 포함
+        cur.execute("""
+            SELECT c.id, c.user_id, c.content, u.username, u.image_url
+            FROM comments c
+            JOIN users_community u ON u.id = c.user_id
+            WHERE c.post_id = %s
+            ORDER BY c.id ASC
+        """, (postID,))
         rows = cur.fetchall()
         for r in rows:
-            data["comments"].append({"commentID": str(r[0]), "userID": str(r[1]), "commentContent": str(r[2])})
+            data["comments"].append({
+                "commentID": str(r[0]), 
+                "userID": str(r[1]), 
+                "commentContent": str(r[2]),
+                "username": str(r[3]),
+                "image_url": str(r[4])
+            })
         cur.close()
         conn.close()
         return jsonify(data), 200
@@ -204,12 +260,24 @@ def get_comment(commentID):
 
     cur = conn.cursor()
     if request.method == "GET":
-        # 수정: 파라미터화된 쿼리 사용
-        cur.execute("SELECT id, user_id, post_id, content FROM comments WHERE id = %s", (commentID,))
+        # 수정: 파라미터화된 쿼리 사용 및 작성자 정보 포함
+        cur.execute("""
+            SELECT c.id, c.user_id, c.post_id, c.content, u.username, u.image_url
+            FROM comments c
+            JOIN users_community u ON u.id = c.user_id
+            WHERE c.id = %s
+        """, (commentID,))
         row = cur.fetchone()
         if row is None:
             return jsonify({"code": "1"}), 404
-        data = {"commentID": str(row[0]), "userID": str(row[1]), "postID": str(row[2]), "commentContent": str(row[3])}
+        data = {
+            "commentID": str(row[0]), 
+            "userID": str(row[1]), 
+            "postID": str(row[2]), 
+            "commentContent": str(row[3]),
+            "username": str(row[4]),
+            "image_url": str(row[5])
+        }
         cur.close()
         conn.close()
         return jsonify(data), 200
@@ -229,15 +297,44 @@ def handle_user_post(userID, postID):  # 수정: userID를 문자열로 받음
             return jsonify({"code": "1"}), 404
         local_user_id = local_user_id_result[0]
         
-        cur.execute("SELECT id, user_id, title, content FROM posts WHERE id = %s AND user_id = %s", (postID, local_user_id))
+        # 수정: 작성자 정보 포함
+        cur.execute("""
+            SELECT p.id, p.user_id, p.title, p.content, u.username, u.image_url
+            FROM posts p
+            JOIN users_community u ON u.id = p.user_id
+            WHERE p.id = %s AND p.user_id = %s
+        """, (postID, local_user_id))
         row = cur.fetchone()
         if row is None:
             return jsonify({"code": "1"}), 404
-        data = {"postID": str(row[0]), "userID": str(row[1]), "postTitle": str(row[2]), "postContent": str(row[3]), "comments": []}
-        cur.execute("SELECT id, user_id, content FROM comments WHERE post_id = %s", (postID,))
+        
+        data = {
+            "postID": str(row[0]), 
+            "userID": str(row[1]), 
+            "postTitle": str(row[2]), 
+            "postContent": str(row[3]),
+            "username": str(row[4]),
+            "image_url": str(row[5]),
+            "comments": []
+        }
+        
+        # 수정: 댓글 작성자 정보 포함
+        cur.execute("""
+            SELECT c.id, c.user_id, c.content, u.username, u.image_url
+            FROM comments c
+            JOIN users_community u ON u.id = c.user_id
+            WHERE c.post_id = %s
+            ORDER BY c.id ASC
+        """, (postID,))
         rows = cur.fetchall()
         for r in rows:
-            data["comments"].append({"commentID": str(r[0]), "userID": str(r[1]), "commentContent": str(r[2])})
+            data["comments"].append({
+                "commentID": str(r[0]), 
+                "userID": str(r[1]), 
+                "commentContent": str(r[2]),
+                "username": str(r[3]),
+                "image_url": str(r[4])
+            })
         cur.close()
         conn.close()
         return jsonify(data), 200
@@ -300,19 +397,30 @@ def handle_user_comment(userID, commentID):  # 수정: userID를 문자열로 �
 
     cur = conn.cursor()
     if request.method == "GET":
-        # 수정: google_id로 users_community.id 조회 후 사용
+        # 수정: google_id로 users_community.id 조회 후 사용 및 작성자 정보 포함
         cur.execute("SELECT id FROM users_community WHERE google_id = %s", (userID,))
         local_user_id_result = cur.fetchone()
         if local_user_id_result is None:
             return jsonify({"code": "1"}), 404
         local_user_id = local_user_id_result[0]
         
-        cur.execute("SELECT id, user_id, post_id, content FROM comments WHERE id = %s AND user_id = %s", 
-                   (commentID, local_user_id))
+        cur.execute("""
+            SELECT c.id, c.user_id, c.post_id, c.content, u.username, u.image_url
+            FROM comments c
+            JOIN users_community u ON u.id = c.user_id
+            WHERE c.id = %s AND c.user_id = %s
+        """, (commentID, local_user_id))
         row = cur.fetchone()
         if row is None:
             return jsonify({"code": "1"}), 404
-        return jsonify({"commentID": str(row[0]), "userID": str(row[1]), "postID": str(row[2]), "commentContent": str(row[3])}), 200
+        return jsonify({
+            "commentID": str(row[0]), 
+            "userID": str(row[1]), 
+            "postID": str(row[2]), 
+            "commentContent": str(row[3]),
+            "username": str(row[4]),
+            "image_url": str(row[5])
+        }), 200
 
     elif request.method == "POST":
         data = request.json
@@ -366,4 +474,4 @@ def handle_user_comment(userID, commentID):  # 수정: userID를 문자열로 �
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000)
 
-# temporary fix from cursor ai. will revert if anything goes wrong.
+# changes are made by cursor ai. will be reverted upon any issues.
