@@ -262,21 +262,26 @@ checkListServer.post('/users/:userId/:estateId/checklists/init', async (req, res
         await client.query('BEGIN');
         console.log("Pool connected."); // <--- 3. DB 연결 성공
         // 삽입을 시작하기 전, 이전에 존재하던 모든 데이터를 삭제합니다. -> 동일 API로 여러번 호출되면 생길 수 있는 문제 방지
+        console.log(`Attempting to DELETE old data for user: ${userId}, estate: ${estateId}`);
         await client.query(
             'DELETE FROM user_checklists WHERE user_id = $1 AND estate_id = $2',
             [userId, estateId]
         );
+        console.log("DELETE complete."); // <-- 이 로그가 안 찍히면 DELETE에서 락(Lock)
 
 
         // --- 1. 'analysis' 카테고리 항목 삽입 ---
 
        // 1-1. ANALYSIS 테이블에서 '특정 유저'의 '특정 매물' 분석 결과 조회
+        console.log(`Attempting to SELECT from analysis for user: ${userId}, estate: ${estateId}`);
         const analysisRes = await client.query(
             `SELECT title_section_analysis, part_a_analysis, part_b_analysis 
             FROM analysis 
             WHERE estate_id = $1 AND user_id = $2`, //user_id 조건 추가
             [estateId, userId] //파라미터에 userId 추가
         );
+        console.log("SELECT from analysis complete."); // <-- 이 로그가 안 찍히면 SELECT에서 락(Lock)
+        // --- 4. 확인 끝 ---
 
         if (analysisRes.rows.length === 0) {
             // 오류 메시지 수정
