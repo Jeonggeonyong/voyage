@@ -55,7 +55,7 @@ async function initializeDatabase() {
     // 5. analysis 테이블 (estates 참조)
     `
     CREATE TABLE IF NOT EXISTS analysis (
-        analysis_id UUID PRIMARY KEY,
+        analysis_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     -- estates 테이블 참조 (FK)
         estate_id UUID REFERENCES estates(estate_id) ON DELETE CASCADE,
     -- [추가25/10/28] users_analysis 테이블 참조 (FK)

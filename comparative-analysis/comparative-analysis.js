@@ -58,7 +58,7 @@ async function initializeDatabase() {
         // 4. ANALYSIS 테이블
         `
         CREATE TABLE IF NOT EXISTS analysis (
-            analysis_id UUID PRIMARY KEY,
+            analysis_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             estate_id UUID REFERENCES estates(estate_id) ON DELETE CASCADE,
             user_id TEXT REFERENCES users_analysis(user_id) ON DELETE CASCADE,
             risk_score INT,
